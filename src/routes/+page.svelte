@@ -18,6 +18,19 @@
     let mistakes = 0;
     let isTyping = false;
     let gameStarted = false;
+    
+    // Timer and game completion
+    let timeLimit = 60; // 60 seconds
+    let timeRemaining = timeLimit;
+    let gameTimer: number | null = null;
+    let gameCompleted = false;
+    let showScoreboard = false;
+    
+    // Statistics tracking
+    let correctWords = 0;
+    let correctNames = 0;
+    let correctSpecialWords = 0;
+    let totalWordsTyped = 0;
 
     // Page state
     let currentPageIndex = 1; // Start from page 1 (0 is cover)
@@ -76,6 +89,50 @@
         globalIndex += wordIndex;
         
         return globalIndex;
+    }
+    
+    // Timer functions
+    function startTimer() {
+        timeRemaining = timeLimit;
+        gameTimer = setInterval(() => {
+            timeRemaining--;
+            if (timeRemaining <= 0) {
+                endGame();
+            }
+        }, 1000);
+    }
+    
+    function stopTimer() {
+        if (gameTimer) {
+            clearInterval(gameTimer);
+            gameTimer = null;
+        }
+    }
+    
+    function endGame() {
+        stopTimer();
+        gameCompleted = true;
+        showScoreboard = true;
+        gameStarted = false;
+    }
+    
+    function closeScoreboard() {
+        showScoreboard = false;
+        gameCompleted = false;
+        gameStarted = false;
+        if(pageFlip){
+            pageFlip.flip(0);
+        }
+    }
+    
+    function isPersonName(word: string): boolean {
+        // Check if the word is a person name (contains capital letters in middle or is a known name)
+        const cleanWord = word.replace(/[!?.,]/g, "");
+        return /[A-Z]/.test(cleanWord.slice(1)) || 
+               ['Light', 'Yagami', 'Lawliet', 'Misa', 'Amane', 'Near', 'River', 'Mello', 'Keehl', 
+                'Ryuk', 'Rem', 'Watari', 'Matsuda', 'Aizawa', 'John', 'Jane', 'Michael', 'Sarah', 
+                'David', 'Lisa', 'Chris', 'Emma', 'Alex', 'Anna', 'James', 'Mary', 'Robert', 
+                'Patricia', 'William', 'Jennifer', 'Richard', 'Linda', 'Joseph', 'Elizabeth'].includes(cleanWord);
     }
 
     // API functions
@@ -174,6 +231,8 @@
 
     function startGame() {
         gameStarted = true;
+        gameCompleted = false;
+        showScoreboard = false;
 
         initBook();
         resetGame();
@@ -184,6 +243,7 @@
             setTimeout(() => {
                 pageFlip.flip(1);
                 triggerWordRevealAnimation();
+                startTimer(); // Start the timer after content is loaded
             }, 100);
         });
 
@@ -201,6 +261,18 @@
         shakeWords = [];
         strikethroughWords = [];
         isTyping = false;
+        
+        // Reset timer and game state
+        stopTimer();
+        timeRemaining = timeLimit;
+        gameCompleted = false;
+        showScoreboard = false;
+        
+        // Reset statistics
+        correctWords = 0;
+        correctNames = 0;
+        correctSpecialWords = 0;
+        totalWordsTyped = 0;
 
         // Reset word locking states
         lockedWords = new Set();
@@ -229,11 +301,17 @@
             setTimeout(() => {
                 pageFlip.flip(1);
                 triggerWordRevealAnimation();
+                startTimer(); 
             }, 100);
         });
     }
 
     function handleInput(event: Event) {
+        if (gameCompleted || timeRemaining <= 0) {
+            event.preventDefault();
+            return; // Don't allow input if game is over
+        }
+        
         const target = event.target as HTMLTextAreaElement;
         const newValue = target.value;
 
@@ -323,6 +401,10 @@
     }
 
     function checkWord() {
+        if (gameCompleted || timeRemaining <= 0) {
+            return; // Don't process input if game is over
+        }
+        
         if (currentWord == undefined) {
             // No more words, add space and continue
             currentInput += " ";
@@ -333,8 +415,21 @@
         const cleanWord = currentWord.replace(/[!?.,]/g, "");
         const cleanInput = currentTypingWord.trim().replace(/[!?.,]/g, "");
         const lastTypedWord = cleanInput.split(" ").pop() || "";
+        
+        totalWordsTyped++;
 
         if (lastTypedWord.toLowerCase() === cleanWord.toLowerCase()) {
+            // Correct word - track statistics
+            correctWords++;
+            
+            if (isPersonName(currentWord)) {
+                correctNames++;
+            }
+            
+            if (isCurrentWordSpecial) {
+                correctSpecialWords++;
+            }
+            
             // Correct word - lock it
             lockedWords.add(globalWordIndex);
             strikethroughWords = [...strikethroughWords, globalWordIndex];
@@ -507,6 +602,12 @@
                                 <div class="text-sm text-gray-400">
                                     Mistakes
                                 </div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold" class:text-red-500={timeRemaining <= 10} class:text-blue-500={timeRemaining > 10}>
+                                    {timeRemaining}s
+                                </div>
+                                <div class="text-sm text-gray-400">Time</div>
                             </div>
                         </div>
 
@@ -740,6 +841,77 @@
             </div>
         {/if}
     </div>
+    
+    <!-- Scoreboard Modal -->
+    {#if showScoreboard}
+        <div class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" on:click={closeScoreboard}>
+            <div class="bg-gradient-to-b from-gray-800 to-gray-900 p-8 rounded-lg shadow-2xl max-w-md w-full mx-4 border border-red-600" on:click|stopPropagation>
+                <div class="text-center mb-6">
+                    <h2 class="text-4xl font-bold text-red-500 mb-2 death-glow">GAME OVER</h2>
+                    <p class="text-gray-300">Time's up! Here are your results:</p>
+                </div>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+                        <span class="text-gray-300">Final Score:</span>
+                        <span class="text-3xl font-bold text-red-500">{score}</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+                        <span class="text-gray-300">Max Combo:</span>
+                        <span class="text-xl font-bold text-yellow-500">{maxCombo}x</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+                        <span class="text-gray-300">Accuracy:</span>
+                        <span class="text-lg font-bold text-green-500">
+                            {totalWordsTyped > 0 ? Math.round((correctWords / totalWordsTyped) * 100) : 0}%
+                        </span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+                        <span class="text-gray-300">Words Typed:</span>
+                        <span class="text-lg font-bold text-blue-500">{totalWordsTyped}</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+                        <span class="text-gray-300">Correct Words:</span>
+                        <span class="text-lg font-bold text-green-500">{correctWords}</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+                        <span class="text-gray-300">Correct Names:</span>
+                        <span class="text-lg font-bold text-purple-500">{correctNames}</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+                        <span class="text-gray-300">Special Words:</span>
+                        <span class="text-lg font-bold text-orange-500">{correctSpecialWords}</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center py-2">
+                        <span class="text-gray-300">Mistakes:</span>
+                        <span class="text-lg font-bold text-red-400">{mistakes}</span>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-4">
+                    <button
+                        on:click={startGame}
+                        class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105"
+                    >
+                        Play Again
+                    </button>
+                    <button
+                        on:click={closeScoreboard}
+                        class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
 </main>
 
 <style>
