@@ -5,6 +5,7 @@
     // API-generated content
     let sentences: string[] = [];
     let specialWords: string[] = [];
+    let personNames: string[] = []; // Store person names from API
     let isLoadingContent = false;
     let contentError: string | null = null;
     
@@ -168,47 +169,24 @@
     }
 
     function isPersonName(word: string): boolean {
-        // Check if the word is a person name (contains capital letters in middle or is a known name)
+        // Check if the word is a person name using API data
         const cleanWord = word.replace(/[!?.,]/g, "");
-        return (
-            /[A-Z]/.test(cleanWord.slice(1)) ||
-            [
-                "Light",
-                "Yagami",
-                "Lawliet",
-                "Misa",
-                "Amane",
-                "Near",
-                "River",
-                "Mello",
-                "Keehl",
-                "Ryuk",
-                "Rem",
-                "Watari",
-                "Matsuda",
-                "Aizawa",
-                "John",
-                "Jane",
-                "Michael",
-                "Sarah",
-                "David",
-                "Lisa",
-                "Chris",
-                "Emma",
-                "Alex",
-                "Anna",
-                "James",
-                "Mary",
-                "Robert",
-                "Patricia",
-                "William",
-                "Jennifer",
-                "Richard",
-                "Linda",
-                "Joseph",
-                "Elizabeth",
-            ].includes(cleanWord)
-        );
+        
+        // Check if word contains capital letters in middle (likely a name)
+        const hasCapitalInMiddle = /[A-Z]/.test(cleanWord.slice(1));
+        
+        // Check against person names from API
+        const isKnownName = personNames.some(name => {
+            // Check full name match
+            if (name.toLowerCase() === cleanWord.toLowerCase()) {
+                return true;
+            }
+            // Check individual parts of the name (first name, last name)
+            const nameParts = name.split(' ');
+            return nameParts.some(part => part.toLowerCase() === cleanWord.toLowerCase());
+        });
+        
+        return hasCapitalInMiddle || isKnownName;
     }
 
     // API functions
@@ -230,10 +208,12 @@
             const data = await response.json();
             sentences = data.sentences;
             specialWords = data.specialWords;
+            personNames = data.personNames || []; // Store person names from API
 
             console.log("Loaded content:", {
                 sentenceCount: sentences.length,
                 specialWordCount: specialWords.length,
+                personNameCount: personNames.length,
             });
         } catch (error) {
             contentError =
@@ -257,6 +237,13 @@
                 "evil",
                 "world",
                 "detective",
+            ];
+            // Fallback person names
+            personNames = [
+                "Light Yagami", "L Lawliet", "Misa Amane", "Near River", "Mello Keehl", 
+                "Ryuk", "Rem", "Watari", "Matsuda", "Aizawa",
+                "John Smith", "Jane Doe", "Michael Johnson", "Sarah Williams", "David Brown", 
+                "Lisa Jones", "Chris Garcia", "Emma Miller", "Alex Davis", "Anna Rodriguez"
             ];
         } finally {
             isLoadingContent = false;

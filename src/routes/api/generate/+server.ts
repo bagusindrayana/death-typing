@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-// Import word pools from other endpoints (we'll inline them for simplicity)
+// Word pools for sentence generation
 const COMMON_WORDS = [
     'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use',
     'run', 'jump', 'walk', 'talk', 'think', 'write', 'read', 'play', 'work', 'help', 'look', 'find', 'give', 'take', 'come', 'make', 'know', 'tell', 'keep', 'turn', 'move', 'live', 'feel', 'show', 'hear', 'leave', 'ask', 'need', 'try', 'call', 'back', 'open', 'close', 'start', 'stop'
@@ -116,6 +116,7 @@ export const GET: RequestHandler = async ({ url }) => {
         sentences: generatedContent.map(content => content.sentence),
         generatedContent,
         specialWords: allSpecialWords,
+        personNames: PERSON_NAMES, // Include person names for client-side validation
         statistics: {
             totalSentences: generatedContent.length,
             averageWordsPerSentence: generatedContent.reduce((sum, content) => sum + content.metadata.totalWords, 0) / generatedContent.length,
