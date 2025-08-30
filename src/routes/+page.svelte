@@ -2,14 +2,11 @@
     import { onMount } from "svelte";
     import * as PageFlip from "page-flip";
 
-    // API-generated content
     let sentences: string[] = [];
     let specialWords: string[] = [];
-    let personNames: string[] = []; // Store person names from API
+    let personNames: string[] = [];
     let isLoadingContent = false;
     let contentError: string | null = null;
-    
-    // Initial app loading state
     let isInitialLoading = true;
 
     // Game state
@@ -24,7 +21,7 @@
     let gameStarted = false;
 
     // Timer and game completion
-    let timeLimit = 60; // 60 seconds
+    let timeLimit = 60;
     let timeRemaining = timeLimit;
     let gameTimer: number | null = null;
     let gameCompleted = false;
@@ -35,8 +32,8 @@
     let correctNames = 0;
     let correctSpecialWords = 0;
     let totalWordsTyped = 0;
-    let typingStartTime: number | null = null; // Track when typing actually started
-    let typingEndTime: number | null = null; // Track when typing ended
+    let typingStartTime: number | null = null;
+    let typingEndTime: number | null = null;
 
     // Page state
     let currentPageIndex = 1; // Start from page 1 (0 is cover)
@@ -73,8 +70,6 @@
     $: isCurrentWordSpecial =
         currentWord != undefined &&
         specialWords.includes(currentWord.toLowerCase().replace(/[!?.,]/g, ""));
-
-    // Calculate global word index for continuous typing
     $: globalWordIndex = calculateGlobalWordIndex(
         currentSentenceIndex,
         currentWordIndex,
@@ -104,7 +99,6 @@
     let ryukBubbleMessage = false;
     let timeoutShowRyukMessage: any = null;
 
-    // show ryuk mesage and hide after 5 seconds
     function showRyukMessage() {
         ryukBubbleMessage = true;
         ryukMessage =
@@ -115,27 +109,22 @@
         }, 5000);
     }
 
-    // Helper function to calculate global word index across all sentences
     function calculateGlobalWordIndex(
         sentenceIndex: number,
         wordIndex: number,
     ): number {
         let globalIndex = 0;
-
-        // Add words from all previous sentences
         for (let i = 0; i < sentenceIndex; i++) {
             if (sentences[i]) {
                 globalIndex += sentences[i].split(" ").length;
             }
         }
 
-        // Add current word index
         globalIndex += wordIndex;
 
         return globalIndex;
     }
 
-    // Timer functions
     function startTimer() {
         timeRemaining = timeLimit;
         gameTimer = setInterval(() => {
@@ -159,7 +148,6 @@
         showScoreboard = true;
         gameStarted = false;
 
-        // Record typing end time for WPS calculation
         if (typingStartTime !== null) {
             typingEndTime = Date.now();
         }
@@ -188,16 +176,12 @@
         // Check if the word is a person name using API data
         const cleanWord = word.replace(/[!?.,]/g, "");
         
-        // Check if word contains capital letters in middle (likely a name)
         const hasCapitalInMiddle = /[A-Z]/.test(cleanWord.slice(1));
         
-        // Check against person names from API
         const isKnownName = personNames.some(name => {
-            // Check full name match
             if (name.toLowerCase() === cleanWord.toLowerCase()) {
                 return true;
             }
-            // Check individual parts of the name (first name, last name)
             const nameParts = name.split(' ');
             return nameParts.some(part => part.toLowerCase() === cleanWord.toLowerCase());
         });
@@ -224,7 +208,7 @@
             const data = await response.json();
             sentences = data.sentences;
             specialWords = data.specialWords;
-            personNames = data.personNames || []; // Store person names from API
+            personNames = data.personNames || [];
 
             console.log("Loaded content:", {
                 sentenceCount: sentences.length,
@@ -254,7 +238,7 @@
                 "world",
                 "detective",
             ];
-            // Fallback person names
+
             personNames = [
                 "Light Yagami", "L Lawliet", "Misa Amane", "Near River", "Mello Keehl", 
                 "Ryuk", "Rem", "Watari", "Matsuda", "Aizawa",
@@ -294,7 +278,6 @@
 
         isAnimating = true;
 
-        // Calculate starting global index for current sentence
         const startGlobalIndex = calculateGlobalWordIndex(
             currentSentenceIndex,
             0,
@@ -308,7 +291,6 @@
 
                 // Mark animation as complete when last word is animated
                 if (index === words.length - 1) {
-                    //DONT DELETE THIS FUCKING CODE
                     setInterval(() => {
                         isAnimating = false;
 
@@ -329,19 +311,15 @@
 
         initBook();
         resetGame();
-
-        // If content is not loaded yet, fetch it first
         if (sentences.length === 0) {
             fetchContent().then(() => {
-                // Trigger word reveal animation with a small delay to ensure DOM is ready
                 setTimeout(() => {
                     pageFlip.flip(1);
                     triggerWordRevealAnimation();
-                    startTimer(); // Start the timer after content is loaded
+                    startTimer();
                 }, 100);
             });
         } else {
-            // Content already loaded, start immediately
             setTimeout(() => {
                 pageFlip.flip(1);
                 triggerWordRevealAnimation();
@@ -362,31 +340,25 @@
         strikethroughWords = [];
         isTyping = false;
 
-        // Reset timer and game state
         stopTimer();
         timeRemaining = timeLimit;
         gameCompleted = false;
         showScoreboard = false;
 
-        // Reset statistics
         correctWords = 0;
         correctNames = 0;
         correctSpecialWords = 0;
         totalWordsTyped = 0;
         typingStartTime = null;
         typingEndTime = null;
-
-        // Reset word locking states
         lockedWords = new Set();
         lockedContent = "";
         currentTypingWord = "";
         lockedWordPositions = [];
 
-        // Reset animation states
         animatedWords = new Set();
         isAnimating = false;
 
-        // Reset page state
         currentPageIndex = 1;
         pageContents = [];
         currentPageSide = "left";
@@ -400,7 +372,6 @@
 
         // Fetch fresh content for restart
         fetchContent().then(() => {
-            // Trigger word reveal animation with a small delay to ensure DOM is ready
             setTimeout(() => {
                 pageFlip.flip(1);
                 triggerWordRevealAnimation();
@@ -412,15 +383,13 @@
     function handleInput(event: Event) {
         if (gameCompleted || timeRemaining <= 0) {
             event.preventDefault();
-            return; // Don't allow input if game is over
+            return;
         }
 
         const target = event.target as HTMLTextAreaElement;
         const newValue = target.value;
 
-        // Check if user is trying to delete locked content
         if (newValue.length < lockedContent.length) {
-            // Prevent deletion of locked content
             target.value = lockedContent + currentTypingWord;
             currentInput = target.value;
             return;
@@ -428,33 +397,25 @@
 
         currentInput = newValue;
 
-        // Extract the currently typing word (after locked content)
         if (currentInput.length >= lockedContent.length) {
             currentTypingWord = currentInput.substring(lockedContent.length);
         }
 
         if (!isTyping && currentInput.length > 0) {
             isTyping = true;
-            // Start tracking typing time when user first starts typing
             if (typingStartTime === null) {
                 typingStartTime = Date.now();
             }
         }
 
-        // Auto-grow the textarea
         autoGrowTextarea(target);
-
-        // Update typed content display
         updateTypedContent();
     }
 
     function autoGrowTextarea(textarea: HTMLTextAreaElement) {
-        // Reset height to auto to get the correct scrollHeight
         textarea.style.height = "auto";
 
         const newHeight = Math.max(12, textarea.scrollHeight);
-
-        // If content exceeds max height, move to next line
         if (previousHeight > 0 && newHeight > previousHeight) {
             addLineBreak();
         }
@@ -486,20 +447,16 @@
         // Check if page is full
         if (currentLine >= maxLinesPerPage) {
             if (currentPageSide === "left") {
-                // Move to right page
                 currentPageSide = "right";
                 currentLine = 0;
                 currentInput = "";
                 lockedContent = "";
                 currentPageIndex += 1;
             } else {
-                // Both pages full, flip to next page
                 flipToNextPage();
-                return; // Exit early since flipToNextPage handles focus
+                return;
             }
         }
-
-        // Focus input after line break and reset height
         setTimeout(() => {
             if (inputElement) {
                 inputElement.focus();
@@ -526,9 +483,7 @@
         totalWordsTyped++;
 
         if (lastTypedWord.toLowerCase() === cleanWord.toLowerCase()) {
-            // Correct word - track statistics
             correctWords++;
-
             if (isPersonName(currentWord)) {
                 correctNames++;
                 if (timeoutShowRyukMessage != null) {
@@ -550,7 +505,6 @@
                 correctSpecialWords++;
             }
 
-            // Correct word - lock it
             lockedWords.add(globalWordIndex);
             strikethroughWords = [...strikethroughWords, globalWordIndex];
 
@@ -565,11 +519,9 @@
                 wordIndex: globalWordIndex,
             });
 
-            // Update locked content
             lockedContent += wordWithSpace;
             currentTypingWord = "";
 
-            // Update the input to reflect locked content
             currentInput = lockedContent;
 
             // Calculate score
@@ -578,7 +530,6 @@
                 wordScore = 25;
             }
 
-            // Apply combo multiplier
             combo++;
             if (combo > 1) {
                 wordScore *= Math.min(combo, 10);
@@ -587,15 +538,12 @@
             score += wordScore;
             maxCombo = Math.max(maxCombo, combo);
 
-            // Move to next word
             currentWordIndex++;
 
-            // Check if sentence is complete
             if (currentWordIndex >= words.length) {
                 nextSentence();
             }
         } else {
-            // Wrong word, just add space to continue
             shakeWords = [...shakeWords, globalWordIndex];
             combo = 0;
             mistakes++;
@@ -617,7 +565,6 @@
 
     function nextSentence() {
         if (sentences.length === 0) {
-            // No sentences available, fetch more content
             fetchContent().then(() => {
                 if (sentences.length > 0) {
                     currentSentenceIndex =
@@ -630,35 +577,20 @@
 
         currentSentenceIndex = (currentSentenceIndex + 1) % sentences.length;
         currentWordIndex = 0;
-        // DON'T reset strikethroughWords - keep the line-through effects for previous words
-        // strikethroughWords = [];
 
-        // Keep the existing input content and add a space separator
         if (currentInput.trim().length > 0) {
-            // Add space between sentences if there's existing content
             currentInput += " ";
             lockedContent += " ";
         }
 
-        // DON'T reset these - keep the continuous typing flow:
-        // lockedWords = new Set();
-        // lockedContent = "";
-        // currentTypingWord = "";
-        // lockedWordPositions = [];
-        // currentInput = "";
-        // strikethroughWords = []; // <- This was causing the issue!
-
-        // Reset only the current typing word for the new sentence
         currentTypingWord = "";
 
-        // Trigger reveal animation for new sentence
         triggerWordRevealAnimation();
     }
 
     function flipToNextPage() {
         currentPageIndex += 1;
 
-        // Focus input after page flip and reset height
         setTimeout(() => {
             pageFlip.flip(currentPageIndex);
 
