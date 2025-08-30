@@ -7,6 +7,9 @@
     let specialWords: string[] = [];
     let isLoadingContent = false;
     let contentError: string | null = null;
+    
+    // Initial app loading state
+    let isInitialLoading = true;
 
     // Game state
     let currentSentenceIndex = 0;
@@ -324,15 +327,24 @@
         initBook();
         resetGame();
 
-        // Fetch content from API before starting
-        fetchContent().then(() => {
-            // Trigger word reveal animation with a small delay to ensure DOM is ready
+        // If content is not loaded yet, fetch it first
+        if (sentences.length === 0) {
+            fetchContent().then(() => {
+                // Trigger word reveal animation with a small delay to ensure DOM is ready
+                setTimeout(() => {
+                    pageFlip.flip(1);
+                    triggerWordRevealAnimation();
+                    startTimer(); // Start the timer after content is loaded
+                }, 100);
+            });
+        } else {
+            // Content already loaded, start immediately
             setTimeout(() => {
                 pageFlip.flip(1);
                 triggerWordRevealAnimation();
-                startTimer(); // Start the timer after content is loaded
+                startTimer();
             }, 100);
-        });
+        }
     }
 
     function resetGame() {
@@ -381,7 +393,7 @@
         showRyuk = true;
         resetGame();
 
-        // Fetch content from API before starting
+        // Fetch fresh content for restart
         fetchContent().then(() => {
             // Trigger word reveal animation with a small delay to ensure DOM is ready
             setTimeout(() => {
@@ -653,8 +665,25 @@
         }, 800);
     }
 
-    onMount(() => {
-        initBook();
+    onMount(async () => {
+        try {
+            // Initialize the book
+            initBook();
+            
+            // Fetch initial content to prepare the app
+            await fetchContent();
+            
+            // Small delay to ensure smooth transition
+            setTimeout(() => {
+                isInitialLoading = false;
+            }, 800);
+        } catch (error) {
+            console.error('Error during app initialization:', error);
+            // Even if there's an error, hide the loading screen
+            setTimeout(() => {
+                isInitialLoading = false;
+            }, 1000);
+        }
     });
 </script>
 
@@ -669,6 +698,42 @@
     <div class="absolute inset-0 opacity-10">
         <div class="absolute inset-0 bg-dots"></div>
     </div>
+
+    <!-- Initial Loading Screen -->
+    {#if isInitialLoading}
+        <div class="fixed inset-0 bg-gradient-to-b from-gray-900 via-gray-800 to-black z-50 flex items-center justify-center">
+            <div class="text-center space-y-8">
+                <!-- Death Note Logo/Title -->
+                <div class="death-font text-6xl md:text-8xl font-bold text-red-500 death-glow mb-8">
+                    Death Typing
+                </div>
+                
+                <!-- Loading Animation -->
+                <div class="flex justify-center items-center space-x-2">
+                    <div class="w-4 h-4 bg-red-500 rounded-full animate-bounce" style="animation-delay: 0ms;"></div>
+                    <div class="w-4 h-4 bg-red-500 rounded-full animate-bounce" style="animation-delay: 150ms;"></div>
+                    <div class="w-4 h-4 bg-red-500 rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
+                </div>
+                
+                <!-- Loading Text -->
+                <div class="text-gray-300 text-lg font-semibold">
+                    {#if isLoadingContent}
+                        Loading content...
+                    {:else}
+                        Initializing...
+                    {/if}
+                </div>
+                
+                <!-- Error Message if any -->
+                {#if contentError}
+                    <div class="text-yellow-500 text-sm max-w-md mx-auto">
+                        <p class="mb-2">⚠️ Warning: {contentError}</p>
+                        <p class="text-gray-400">Using fallback content...</p>
+                    </div>
+                {/if}
+            </div>
+        </div>
+    {/if}
 
     <!-- Start screen -->
     <div class="relative z-10 min-h-screen w-full py-6 space-y-4">
@@ -958,9 +1023,19 @@
             <div class="text-center">
                 <button
                     on:click={startGame}
-                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+                    disabled={isLoadingContent}
+                    class="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
                 >
-                    Start Typing Test
+                    {#if isLoadingContent}
+                        <div class="flex items-center justify-center space-x-2">
+                            <div class="w-4 h-4 bg-white rounded-full animate-bounce" style="animation-delay: 0ms;"></div>
+                            <div class="w-4 h-4 bg-white rounded-full animate-bounce" style="animation-delay: 150ms;"></div>
+                            <div class="w-4 h-4 bg-white rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
+                            <span class="ml-2">Loading...</span>
+                        </div>
+                    {:else}
+                        Start Typing Test
+                    {/if}
                 </button>
             </div>
         {/if}
@@ -1239,5 +1314,36 @@
 
     .animate-bounceMessage {
         animation: bounceMessage 200ms ease-in-out;
+    }
+    
+    /* Death glow effect for loading screen */
+    .death-glow {
+        text-shadow: 
+            0 0 5px #ef4444,
+            0 0 10px #ef4444,
+            0 0 15px #ef4444,
+            0 0 20px #dc2626,
+            0 0 25px #dc2626;
+        animation: pulse-glow 2s ease-in-out infinite alternate;
+    }
+    
+    @keyframes pulse-glow {
+        from {
+            text-shadow: 
+                0 0 5px #ef4444,
+                0 0 10px #ef4444,
+                0 0 15px #ef4444,
+                0 0 20px #dc2626,
+                0 0 25px #dc2626;
+        }
+        to {
+            text-shadow: 
+                0 0 10px #ef4444,
+                0 0 15px #ef4444,
+                0 0 20px #ef4444,
+                0 0 25px #dc2626,
+                0 0 30px #dc2626,
+                0 0 35px #dc2626;
+        }
     }
 </style>
