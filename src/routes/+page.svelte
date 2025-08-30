@@ -1,0 +1,837 @@
+<script lang="ts">
+    import { onMount } from "svelte";
+    import * as PageFlip from "page-flip";
+
+    // API-generated content
+    let sentences: string[] = [];
+    let specialWords: string[] = [];
+    let isLoadingContent = false;
+    let contentError: string | null = null;
+
+    // Game state
+    let currentSentenceIndex = 0;
+    let currentWordIndex = 0;
+    let currentInput = "";
+    let score = 0;
+    let combo = 0;
+    let maxCombo = 0;
+    let mistakes = 0;
+    let isTyping = false;
+    let gameStarted = false;
+
+    // Page state
+    let currentPageIndex = 1; // Start from page 1 (0 is cover)
+    let currentPageSide: "left" | "right" = "left";
+    let pageContents: string[] = [];
+    let typedContent = "";
+    let currentLine = 0;
+    let maxLinesPerPage = 16;
+    let previousHeight = 0;
+    let totalPage = 100;
+
+    // Animation states
+    let shakeWords: number[] = [];
+    let strikethroughWords: number[] = [];
+
+    // Word locking states
+    let lockedWords: Set<number> = new Set();
+    let lockedContent = "";
+    let currentTypingWord = "";
+    let lockedWordPositions: {
+        start: number;
+        end: number;
+        wordIndex: number;
+    }[] = [];
+    
+    // Animation states
+    let animatedWords: Set<number> = new Set();
+    let isAnimating = false;
+
+    // Reactive statements
+    $: currentSentence = sentences[currentSentenceIndex] || "";
+    $: words = currentSentence ? currentSentence.split(" ") : [];
+    $: currentWord = words[currentWordIndex];
+    $: isCurrentWordSpecial =
+        currentWord != undefined &&
+        specialWords.includes(currentWord.toLowerCase().replace(/[!?.,]/g, ""));
+    
+    // Calculate global word index for continuous typing
+    $: globalWordIndex = calculateGlobalWordIndex(currentSentenceIndex, currentWordIndex);
+
+    let pageFlip: PageFlip.PageFlip;
+    let inputElement: HTMLTextAreaElement;
+
+    // Helper function to calculate global word index across all sentences
+    function calculateGlobalWordIndex(sentenceIndex: number, wordIndex: number): number {
+        let globalIndex = 0;
+        
+        // Add words from all previous sentences
+        for (let i = 0; i < sentenceIndex; i++) {
+            if (sentences[i]) {
+                globalIndex += sentences[i].split(" ").length;
+            }
+        }
+        
+        // Add current word index
+        globalIndex += wordIndex;
+        
+        return globalIndex;
+    }
+
+    // API functions
+    async function fetchContent() {
+        if (isLoadingContent) return;
+        
+        isLoadingContent = true;
+        contentError = null;
+        
+        try {
+            const response = await fetch('/api/generate?count=10&wordsPerSentence=12');
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch content: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            sentences = data.sentences;
+            specialWords = data.specialWords;
+            
+            console.log('Loaded content:', { 
+                sentenceCount: sentences.length, 
+                specialWordCount: specialWords.length 
+            });
+            
+        } catch (error) {
+            contentError = error instanceof Error ? error.message : 'Failed to load content';
+            console.error('Error fetching content:', error);
+            
+            // Fallback to default content
+            sentences = [
+                "I am justice! I protect the innocent and those who fear evil!",
+                "This world is rotten and those who are making it rot deserve to die!",
+                "The real evil is the power to kill people!",
+                "I will reign over a new world as its god!",
+                "Humans are so interesting!"
+            ];
+            specialWords = ["justice", "god", "death", "evil", "world", "detective"];
+        } finally {
+            isLoadingContent = false;
+        }
+    }
+
+    function initBook() {
+        if (pageFlip == undefined) {
+            const bookElement = document.getElementById("book");
+            if (!bookElement) {
+                console.error("Book element not found");
+                return;
+            }
+
+            pageFlip = new PageFlip.PageFlip(bookElement, {
+                width: 400,
+                height: 600,
+                showCover: true,
+                disableFlipByClick: true,
+                useMouseEvents: false,
+                clickEventForward: false,
+                drawShadow: false,
+            });
+            pageFlip.loadFromHTML(document.querySelectorAll(".my-page"));
+        } else {
+            pageFlip.updateFromHtml(document.querySelectorAll(".my-page"));
+        }
+    }
+
+    function triggerWordRevealAnimation() {
+        if (isAnimating) return;
+        
+        isAnimating = true;
+        
+        // Calculate starting global index for current sentence
+        const startGlobalIndex = calculateGlobalWordIndex(currentSentenceIndex, 0);
+        
+        // Animate words with staggered delay
+        words.forEach((_, index) => {
+            setTimeout(() => {
+                const globalIndex = startGlobalIndex + index;
+                animatedWords = new Set([...animatedWords, globalIndex]);
+                
+                // Mark animation as complete when last word is animated
+                if (index === words.length - 1) {
+                    //DONT DELETE THIS FUCKING CODE
+                    setInterval(() => {
+                        isAnimating = false;
+                        
+
+                        if (inputElement) {
+                                inputElement.focus();
+                            }
+                    }, 1000);
+                }
+            }, index * 30);
+        });
+    }
+
+    function startGame() {
+        gameStarted = true;
+
+        initBook();
+        resetGame();
+        
+        // Fetch content from API before starting
+        fetchContent().then(() => {
+            // Trigger word reveal animation with a small delay to ensure DOM is ready
+            setTimeout(() => {
+                pageFlip.flip(1);
+                triggerWordRevealAnimation();
+            }, 100);
+        });
+
+        
+    }
+
+    function resetGame() {
+        currentSentenceIndex = 0;
+        currentWordIndex = 0;
+        currentInput = "";
+        score = 0;
+        combo = 0;
+        maxCombo = 0;
+        mistakes = 0;
+        shakeWords = [];
+        strikethroughWords = [];
+        isTyping = false;
+
+        // Reset word locking states
+        lockedWords = new Set();
+        lockedContent = "";
+        currentTypingWord = "";
+        lockedWordPositions = [];
+        
+        // Reset animation states
+        animatedWords = new Set();
+        isAnimating = false;
+
+        // Reset page state
+        currentPageIndex = 1;
+        pageContents = [];
+        currentPageSide = "left";
+        typedContent = "";
+        currentLine = 0;
+    }
+
+    function restartGame(){
+        resetGame();
+        
+        // Fetch content from API before starting
+        fetchContent().then(() => {
+            // Trigger word reveal animation with a small delay to ensure DOM is ready
+            setTimeout(() => {
+                pageFlip.flip(1);
+                triggerWordRevealAnimation();
+            }, 100);
+        });
+    }
+
+    function handleInput(event: Event) {
+        const target = event.target as HTMLTextAreaElement;
+        const newValue = target.value;
+
+        // Check if user is trying to delete locked content
+        if (newValue.length < lockedContent.length) {
+            // Prevent deletion of locked content
+            target.value = lockedContent + currentTypingWord;
+            currentInput = target.value;
+            return;
+        }
+
+        currentInput = newValue;
+
+        // Extract the currently typing word (after locked content)
+        if (currentInput.length >= lockedContent.length) {
+            currentTypingWord = currentInput.substring(lockedContent.length);
+        }
+
+        if (!isTyping && currentInput.length > 0) {
+            isTyping = true;
+        }
+
+        // Auto-grow the textarea
+        autoGrowTextarea(target);
+
+        // Update typed content display
+        updateTypedContent();
+    }
+
+    function autoGrowTextarea(textarea: HTMLTextAreaElement) {
+        // Reset height to auto to get the correct scrollHeight
+        textarea.style.height = "auto";
+
+        const newHeight = Math.max(12, textarea.scrollHeight);
+
+        // If content exceeds max height, move to next line
+        if (previousHeight > 0 && newHeight > previousHeight) {
+            addLineBreak();
+        }
+
+        textarea.style.height = newHeight + "px";
+        previousHeight = newHeight;
+    }
+
+    function handleKeydown(event: KeyboardEvent) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            currentInput += "\n";
+            //addLineBreak();
+        } else if (event.key === " ") {
+            event.preventDefault();
+            checkWord();
+        }
+    }
+
+    function addLineBreak() {
+        // Store the current line content
+        const lineContent = currentInput.trim();
+        console.log(lineContent);
+
+        pageContents[currentPageIndex - 1] = lineContent;
+
+        currentLine++;
+
+        // Check if page is full
+        if (currentLine >= maxLinesPerPage) {
+            if (currentPageSide === "left") {
+                // Move to right page
+                currentPageSide = "right";
+                currentLine = 0;
+                currentInput = "";
+                lockedContent = "";
+                currentPageIndex += 1;
+            } else {
+                // Both pages full, flip to next page
+                flipToNextPage();
+                return; // Exit early since flipToNextPage handles focus
+            }
+        }
+
+        // Focus input after line break and reset height
+        setTimeout(() => {
+            if (inputElement) {
+                inputElement.focus();
+            }
+        }, 0);
+    }
+
+    function checkWord() {
+        if (currentWord == undefined) {
+            // No more words, add space and continue
+            currentInput += " ";
+            currentTypingWord += " ";
+            return;
+        }
+
+        const cleanWord = currentWord.replace(/[!?.,]/g, "");
+        const cleanInput = currentTypingWord.trim().replace(/[!?.,]/g, "");
+        const lastTypedWord = cleanInput.split(" ").pop() || "";
+
+        if (lastTypedWord.toLowerCase() === cleanWord.toLowerCase()) {
+            // Correct word - lock it
+            lockedWords.add(globalWordIndex);
+            strikethroughWords = [...strikethroughWords, globalWordIndex];
+
+            // Store the position of this locked word
+            const wordStart = lockedContent.length;
+            const wordWithSpace = lastTypedWord + " ";
+            const wordEnd = wordStart + wordWithSpace.length;
+
+            lockedWordPositions.push({
+                start: wordStart,
+                end: wordEnd,
+                wordIndex: globalWordIndex,
+            });
+
+            // Update locked content
+            lockedContent += wordWithSpace;
+            currentTypingWord = "";
+
+            // Update the input to reflect locked content
+            currentInput = lockedContent;
+
+            // Calculate score
+            let wordScore = 10;
+            if (isCurrentWordSpecial) {
+                wordScore = 25;
+            }
+
+            // Apply combo multiplier
+            combo++;
+            if (combo > 1) {
+                wordScore *= Math.min(combo, 10);
+            }
+
+            score += wordScore;
+            maxCombo = Math.max(maxCombo, combo);
+
+            // Move to next word
+            currentWordIndex++;
+
+            // Check if sentence is complete
+            if (currentWordIndex >= words.length) {
+                nextSentence();
+            }
+        } else {
+            // Wrong word, just add space to continue
+            shakeWords = [...shakeWords, globalWordIndex];
+            combo = 0;
+            mistakes++;
+            currentTypingWord += " ";
+            currentInput = lockedContent + currentTypingWord;
+
+            // Remove shake effect after animation
+            setTimeout(() => {
+                shakeWords = shakeWords.filter((i) => i !== globalWordIndex);
+            }, 600);
+        }
+
+        updateTypedContent();
+    }
+
+    function updateTypedContent() {
+        pageContents[currentPageIndex - 1] = currentInput;
+    }
+
+    function nextSentence() {
+        if (sentences.length === 0) {
+            // No sentences available, fetch more content
+            fetchContent().then(() => {
+                if (sentences.length > 0) {
+                    currentSentenceIndex = (currentSentenceIndex + 1) % sentences.length;
+                    triggerWordRevealAnimation();
+                }
+            });
+            return;
+        }
+        
+        currentSentenceIndex = (currentSentenceIndex + 1) % sentences.length;
+        currentWordIndex = 0;
+        strikethroughWords = [];
+
+        // Keep the existing input content and add a space separator
+        if (currentInput.trim().length > 0) {
+            // Add space between sentences if there's existing content
+            currentInput += " ";
+            lockedContent += " ";
+        }
+
+        // DON'T reset these - keep the continuous typing flow:
+        // lockedWords = new Set();
+        // lockedContent = "";
+        // currentTypingWord = "";
+        // lockedWordPositions = [];
+        // currentInput = "";
+
+        // Reset only the current typing word for the new sentence
+        currentTypingWord = "";
+
+        // Trigger reveal animation for new sentence
+        triggerWordRevealAnimation();
+    }
+
+    function flipToNextPage() {
+        currentPageIndex += 1;
+
+        // Focus input after page flip and reset height
+        setTimeout(() => {
+            pageFlip.flip(currentPageIndex);
+
+            // Reset for new page
+            pageContents = [];
+            currentPageSide = "left";
+            currentLine = 0;
+            currentInput = "";
+            if (inputElement) {
+                inputElement.style.height = "auto";
+                inputElement.focus();
+            }
+        }, 800);
+    }
+
+    onMount(() => {
+        initBook();
+    });
+</script>
+
+<svelte:head>
+    <title>Death Typing</title>
+</svelte:head>
+
+<main
+    class="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-black text-white overflow-hidden"
+>
+    <!-- Background pattern -->
+    <div class="absolute inset-0 opacity-10">
+        <div class="absolute inset-0 bg-dots"></div>
+    </div>
+
+    <!-- Start screen -->
+    <div class="relative z-10 min-h-screen w-full py-6 space-y-4">
+        <div class="min-h-[100px]">
+            {#if gameStarted}
+                <!-- Game interface -->
+                <div class="relative z-10 p-8">
+                    <!-- Score display -->
+                    <div class="flex justify-between items-center mb-8">
+                        <div class="flex space-x-8">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-red-500">
+                                    {score}
+                                </div>
+                                <div class="text-sm text-gray-400">Score</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-yellow-500">
+                                    {combo}x
+                                </div>
+                                <div class="text-sm text-gray-400">Combo</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-green-500">
+                                    {maxCombo}x
+                                </div>
+                                <div class="text-sm text-gray-400">Best</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-red-400">
+                                    {mistakes}
+                                </div>
+                                <div class="text-sm text-gray-400">
+                                    Mistakes
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            on:click={restartGame}
+                            class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
+                        >
+                            Restart
+                        </button>
+                    </div>
+
+                    <!-- Clipping text display -->
+                    <div>
+                        <div
+                            class="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto"
+                        >
+                            {#each words as word, index}
+                                {@const globalIndex = calculateGlobalWordIndex(currentSentenceIndex, index)}
+                                <div class:animate-shake={shakeWords.includes(
+                                        globalIndex,
+                                    )}>
+                                    <div
+                                    class="relative"
+                                    
+                                    class:animate-fadeInBounce={animatedWords.has(globalIndex)}
+                                    
+                                    class:word-hidden={!animatedWords.has(globalIndex)}
+                                    style="animation-delay: {index * 30}ms;"
+                                >
+                                    <!-- Paper clipping background -->
+                                    <div
+                                        class="px-4 py-2 transform -rotate-2 shadow-lg relative clip-paper transition-all duration-300"
+                                        class:bg-red-600={specialWords.includes(
+                                            word
+                                                .toLowerCase()
+                                                .replace(/[!?.,]/g, ""),
+                                        )}
+                                        class:bg-gray-200={!specialWords.includes(
+                                            word
+                                                .toLowerCase()
+                                                .replace(/[!?.,]/g, ""),
+                                        ) && !lockedWords.has(globalIndex)}
+                                        class:bg-black={lockedWords.has(
+                                            globalIndex,
+                                        ) &&
+                                            !specialWords.includes(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
+                                            )}
+                                        class:bg-red-900={lockedWords.has(
+                                            globalIndex,
+                                        ) &&
+                                            specialWords.includes(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
+                                            )}
+                                        class:text-white={specialWords.includes(
+                                            word
+                                                .toLowerCase()
+                                                .replace(/[!?.,]/g, ""),
+                                        ) || lockedWords.has(globalIndex)}
+                                        class:text-black={!specialWords.includes(
+                                            word
+                                                .toLowerCase()
+                                                .replace(/[!?.,]/g, ""),
+                                        ) && !lockedWords.has(globalIndex)}
+                                        class:animate-pulse={index ===
+                                            currentWordIndex}
+                                            style="transform: rotate({Math.floor(Math.random() * 11) - 5}deg);"
+                                    >
+                                        <span
+                                            class="relative text-2xl font-bold"
+                                            class:line-through={strikethroughWords.includes(
+                                                index,
+                                            )}
+                                            class:text-current={index !==
+                                                currentWordIndex}
+                                            class:text-red-600={index ===
+                                                currentWordIndex &&
+                                                !specialWords.includes(
+                                                    word
+                                                        .toLowerCase()
+                                                        .replace(/[!?.,]/g, ""),
+                                                )}
+                                            class:text-yellow-200={index ===
+                                                currentWordIndex &&
+                                                specialWords.includes(
+                                                    word
+                                                        .toLowerCase()
+                                                        .replace(/[!?.,]/g, ""),
+                                                )}
+                                            class:animate-pulse={index ===
+                                                currentWordIndex}
+                                        >
+                                            {word}
+                                        </span>
+                                    </div>
+                                </div>
+                                </div>
+                            {/each}
+                        </div>
+                    </div>
+                </div>
+            {/if}
+        </div>
+        <div
+            class="relative transition-all duration-500 ease-in-out mx-auto w-full flex justify-center"
+            class:slide-book={gameStarted}
+            class:slide-book-close={!gameStarted}
+        >
+            <div id="book">
+                <div
+                    class="my-page bg-black p-2 relative cover-page"
+                    data-density="hard"
+                >
+                    <div
+                        class="flex justify-center items-center text-white text-4xl font-bold tracking w-full h-full"
+                    >
+                        Death Typing
+                    </div>
+                </div>
+                {#each Array(totalPage) as _, totalPageIndex}
+                    {#if totalPageIndex % 2 == 0 || totalPageIndex == 0}
+                        <!-- Left Page -->
+                        <div
+                            class="my-page bg-gradient-to-b from-gray-100 to-gray-50 rounded-lg shadow-2xl p-8 relative transform book-page"
+                        >
+                            <!-- Page lines -->
+                            <div class="absolute inset-8 pointer-events-none">
+                                {#each Array(16) as _, i}
+                                    <div
+                                        class="border-b border-blue-200 opacity-50 h-8"
+                                    ></div>
+                                {/each}
+                            </div>
+
+                            <div class="relative z-10 pl-1">
+                                <!-- Display typed lines -->
+                                {#if currentPageSide === "left" && currentPageIndex - 1 == totalPageIndex}
+                                    <textarea
+                                        bind:this={inputElement}
+                                        bind:value={currentInput}
+                                        on:input={handleInput}
+                                        on:keydown={handleKeydown}
+                                        placeholder="Type here..."
+                                        class="w-full bg-transparent border-none outline-none text-lg text-gray-800 font-mono leading-8 pr-4 resize-none overflow-hidden"
+                                        style="font-family: 'Courier New', monospace; max-width: calc(100% - 2rem); min-height: 2rem;"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        rows="1"
+                                    ></textarea>
+                                {:else}
+                                    <div
+                                        class="h-8 leading-8 text-gray-800 font-mono text-lg"
+                                        style="font-family: 'Courier New', monospace;"
+                                    >
+                                        <span
+                                            >{pageContents[
+                                                totalPageIndex
+                                            ]}</span
+                                        >
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    {:else}
+                        <!-- Right Page -->
+                        <div
+                            class="my-page bg-gradient-to-b from-gray-100 to-gray-50 rounded-lg shadow-2xl p-8 relative transform book-page"
+                        >
+                            <!-- Page lines -->
+                            <div class="absolute inset-8 pointer-events-none">
+                                {#each Array(16) as _, i}
+                                    <div
+                                        class="border-b border-blue-200 opacity-50 h-8"
+                                    ></div>
+                                {/each}
+                            </div>
+
+                            <div class="relative z-10 pl-1">
+                                {#if currentPageSide === "right" && currentPageIndex - 1 == totalPageIndex}
+                                    <textarea
+                                        bind:this={inputElement}
+                                        bind:value={currentInput}
+                                        on:input={handleInput}
+                                        on:keydown={handleKeydown}
+                                        placeholder="Type here..."
+                                        class="w-full bg-transparent border-none outline-none text-lg text-gray-800 font-mono leading-8 pr-4 resize-none overflow-hidden"
+                                        style="font-family: 'Courier New', monospace; max-width: calc(100% - 2rem); min-height: 2rem;"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        rows="1"
+                                    ></textarea>
+                                {:else}
+                                    <div
+                                        class="h-8 leading-8 text-gray-800 font-mono text-lg"
+                                        style="font-family: 'Courier New', monospace;"
+                                    >
+                                        <span
+                                            >{pageContents[
+                                                totalPageIndex
+                                            ]}</span
+                                        >
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    {/if}
+                {/each}
+
+                <div class="my-page bg-black p-2 relative" data-density="hard">
+                    <div
+                        class="flex justify-center items-center text-white text-xl font-bold w-full h-full"
+                    >
+                        The End
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {#if !gameStarted}
+            <div class="text-center">
+                <button
+                    on:click={startGame}
+                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+                >
+                    Start Typing Test
+                </button>
+            </div>
+        {/if}
+    </div>
+</main>
+
+<style>
+    .bg-dots {
+        background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
+        background-size: 40px 40px;
+    }
+
+    .clip-paper {
+        font-family: "serif";
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+    }
+
+    .book-page {
+        perspective: 1000px;
+    }
+
+    @keyframes shake {
+        0%,
+        100% {
+            transform: translateX(0);
+        }
+        10%,
+        30%,
+        50%,
+        70%,
+        90% {
+            transform: translateX(-2px);
+        }
+        20%,
+        40%,
+        60%,
+        80% {
+            transform: translateX(2px);
+        }
+    }
+
+    @keyframes fadeInBounce {
+        0% {
+            opacity: 0;
+            transform: translateY(-40px) rotate(-5deg);
+        }
+        60% {
+            opacity: 1;
+            transform: translateY(8px) rotate(2deg);
+        }
+        80% {
+            transform: translateY(-3px) rotate(-1deg);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0) rotate(0deg);
+        }
+    }
+
+    @keyframes flip {
+        0% {
+            transform: rotateY(0deg);
+        }
+        50% {
+            transform: rotateY(-90deg);
+        }
+        100% {
+            transform: rotateY(0deg);
+        }
+    }
+
+    .animate-shake {
+        animation: shake 0.6s ease-in-out;
+    }
+
+    .animate-fadeInBounce {
+        animation: fadeInBounce 0.3s ease-out;
+        animation-fill-mode: both;
+    }
+
+    .word-hidden {
+        opacity: 0;
+        transform: translateY(-40px) scale(0.7) rotate(-5deg);
+    }
+
+    @keyframes pulse {
+        0%,
+        100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
+    }
+
+    .animate-pulse {
+        animation: pulse 1s ease-in-out infinite;
+    }
+</style>
