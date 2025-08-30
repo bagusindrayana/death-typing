@@ -35,30 +35,48 @@ function generateRandomSentence(wordCount: number = 12): GeneratedContent {
     let nameCount = 0;
     let specialWordCount = 0;
     
-    // Ensure at least 1-2 special words per sentence
+    // Ensure at least 1 name and 1-2 special words per sentence
     const targetSpecialWords = Math.min(Math.floor(wordCount * 0.2) + 1, 3);
-    const targetNames = Math.min(Math.floor(wordCount * 0.15), 2);
+    const minNames = 1; // Guarantee at least 1 name per sentence
+    const targetNames = Math.max(minNames, Math.min(Math.floor(wordCount * 0.15), 2));
     
     for (let i = 0; i < wordCount; i++) {
         const rand = Math.random();
+        const wordsRemaining = wordCount - i;
+        const namesNeeded = targetNames - nameCount;
+        const specialWordsNeeded = targetSpecialWords - specialWordCount;
         
-        // Determine word type based on targets and current counts
-        if (specialWordCount < targetSpecialWords && (rand < 0.25 || i === wordCount - 1)) {
-            // Add special word
-            const specialWord = SPECIAL_WORDS[Math.floor(Math.random() * SPECIAL_WORDS.length)];
-            sentence.push(specialWord);
-            specialWordsInSentence.push(specialWord);
-            specialWordCount++;
-        } else if (nameCount < targetNames && rand < 0.15) {
+        // Force adding a name if we're running out of words and haven't met the minimum
+        if (namesNeeded > 0 && wordsRemaining <= namesNeeded) {
             // Add person name
             const name = PERSON_NAMES[Math.floor(Math.random() * PERSON_NAMES.length)];
             sentence.push(name);
             nameCount++;
+        } else if (specialWordsNeeded > 0 && wordsRemaining <= specialWordsNeeded && nameCount >= minNames) {
+            // Add special word (only if we already have minimum names)
+            const specialWord = SPECIAL_WORDS[Math.floor(Math.random() * SPECIAL_WORDS.length)];
+            sentence.push(specialWord);
+            specialWordsInSentence.push(specialWord);
+            specialWordCount++;
         } else {
-            // Add common word
-            const commonWord = COMMON_WORDS[Math.floor(Math.random() * COMMON_WORDS.length)];
-            sentence.push(commonWord);
-            commonWordCount++;
+            // Normal random distribution
+            if (specialWordCount < targetSpecialWords && rand < 0.25) {
+                // Add special word
+                const specialWord = SPECIAL_WORDS[Math.floor(Math.random() * SPECIAL_WORDS.length)];
+                sentence.push(specialWord);
+                specialWordsInSentence.push(specialWord);
+                specialWordCount++;
+            } else if (nameCount < targetNames && rand < 0.3) {
+                // Add person name (increased probability to 0.3)
+                const name = PERSON_NAMES[Math.floor(Math.random() * PERSON_NAMES.length)];
+                sentence.push(name);
+                nameCount++;
+            } else {
+                // Add common word
+                const commonWord = COMMON_WORDS[Math.floor(Math.random() * COMMON_WORDS.length)];
+                sentence.push(commonWord);
+                commonWordCount++;
+            }
         }
     }
     

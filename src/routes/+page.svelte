@@ -811,12 +811,20 @@
                                                 word
                                                     .toLowerCase()
                                                     .replace(/[!?.,]/g, ""),
+                                            ) || isPersonName(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
                                             )}
                                             class:bg-gray-200={!specialWords.includes(
                                                 word
                                                     .toLowerCase()
                                                     .replace(/[!?.,]/g, ""),
-                                            ) && !lockedWords.has(globalIndex)}
+                                            ) && !lockedWords.has(globalIndex) && !isPersonName(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
+                                            )}
                                             class:bg-black={lockedWords.has(
                                                 globalIndex,
                                             ) &&
@@ -828,16 +836,24 @@
                                             class:bg-red-900={lockedWords.has(
                                                 globalIndex,
                                             ) &&
-                                                specialWords.includes(
+                                                (specialWords.includes(
                                                     word
                                                         .toLowerCase()
                                                         .replace(/[!?.,]/g, ""),
-                                                )}
+                                                ) || personNames.includes(
+                                                    word
+                                                        .toLowerCase()
+                                                        .replace(/[!?.,]/g, ""),
+                                                ))}
                                             class:text-white={specialWords.includes(
                                                 word
                                                     .toLowerCase()
                                                     .replace(/[!?.,]/g, ""),
-                                            ) || lockedWords.has(globalIndex)}
+                                            ) || lockedWords.has(globalIndex) || isPersonName(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
+                                            )}
                                             class:text-black={!specialWords.includes(
                                                 word
                                                     .toLowerCase()
