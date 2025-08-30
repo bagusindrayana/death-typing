@@ -18,14 +18,14 @@
     let mistakes = 0;
     let isTyping = false;
     let gameStarted = false;
-    
+
     // Timer and game completion
     let timeLimit = 60; // 60 seconds
     let timeRemaining = timeLimit;
     let gameTimer: number | null = null;
     let gameCompleted = false;
     let showScoreboard = false;
-    
+
     // Statistics tracking
     let correctWords = 0;
     let correctNames = 0;
@@ -55,7 +55,7 @@
         end: number;
         wordIndex: number;
     }[] = [];
-    
+
     // Animation states
     let animatedWords: Set<number> = new Set();
     let isAnimating = false;
@@ -67,30 +67,59 @@
     $: isCurrentWordSpecial =
         currentWord != undefined &&
         specialWords.includes(currentWord.toLowerCase().replace(/[!?.,]/g, ""));
-    
+
     // Calculate global word index for continuous typing
-    $: globalWordIndex = calculateGlobalWordIndex(currentSentenceIndex, currentWordIndex);
+    $: globalWordIndex = calculateGlobalWordIndex(
+        currentSentenceIndex,
+        currentWordIndex,
+    );
 
     let pageFlip: PageFlip.PageFlip;
     let inputElement: HTMLTextAreaElement;
 
+    let ryukMessages = [
+        "Make bukunya bukan begitu",
+        "Bukan begitu cara makenya",
+        "Cara kerjanya bukan begitu",
+    ];
+
+    let showRyuk = false;
+    let ryukMessage =
+        ryukMessages[Math.floor(Math.random() * ryukMessages.length)];
+    let ryukBubbleMessage = false;
+    let timeoutShowRyukMessage: any = null;
+
+    // show ryuk mesage and hide after 5 seconds
+    function showRyukMessage() {
+        ryukBubbleMessage = true;
+        ryukMessage =
+            ryukMessages[Math.floor(Math.random() * ryukMessages.length)];
+        timeoutShowRyukMessage = setTimeout(() => {
+            ryukBubbleMessage = false;
+            timeoutShowRyukMessage = null;
+        }, 5000);
+    }
+
     // Helper function to calculate global word index across all sentences
-    function calculateGlobalWordIndex(sentenceIndex: number, wordIndex: number): number {
+    function calculateGlobalWordIndex(
+        sentenceIndex: number,
+        wordIndex: number,
+    ): number {
         let globalIndex = 0;
-        
+
         // Add words from all previous sentences
         for (let i = 0; i < sentenceIndex; i++) {
             if (sentences[i]) {
                 globalIndex += sentences[i].split(" ").length;
             }
         }
-        
+
         // Add current word index
         globalIndex += wordIndex;
-        
+
         return globalIndex;
     }
-    
+
     // Timer functions
     function startTimer() {
         timeRemaining = timeLimit;
@@ -101,76 +130,131 @@
             }
         }, 1000);
     }
-    
+
     function stopTimer() {
         if (gameTimer) {
             clearInterval(gameTimer);
             gameTimer = null;
         }
     }
-    
+
     function endGame() {
         stopTimer();
         gameCompleted = true;
         showScoreboard = true;
         gameStarted = false;
+
+        if (timeoutShowRyukMessage != null) {
+            clearTimeout(timeoutShowRyukMessage);
+        }
+        ryukBubbleMessage = true;
+        ryukMessage = "Gokil!";
+        timeoutShowRyukMessage = setTimeout(() => {
+            ryukBubbleMessage = false;
+            timeoutShowRyukMessage = null;
+        }, 5000);
     }
-    
+
     function closeScoreboard() {
         showScoreboard = false;
         gameCompleted = false;
         gameStarted = false;
-        if(pageFlip){
+        if (pageFlip) {
             pageFlip.flip(0);
         }
     }
-    
+
     function isPersonName(word: string): boolean {
         // Check if the word is a person name (contains capital letters in middle or is a known name)
         const cleanWord = word.replace(/[!?.,]/g, "");
-        return /[A-Z]/.test(cleanWord.slice(1)) || 
-               ['Light', 'Yagami', 'Lawliet', 'Misa', 'Amane', 'Near', 'River', 'Mello', 'Keehl', 
-                'Ryuk', 'Rem', 'Watari', 'Matsuda', 'Aizawa', 'John', 'Jane', 'Michael', 'Sarah', 
-                'David', 'Lisa', 'Chris', 'Emma', 'Alex', 'Anna', 'James', 'Mary', 'Robert', 
-                'Patricia', 'William', 'Jennifer', 'Richard', 'Linda', 'Joseph', 'Elizabeth'].includes(cleanWord);
+        return (
+            /[A-Z]/.test(cleanWord.slice(1)) ||
+            [
+                "Light",
+                "Yagami",
+                "Lawliet",
+                "Misa",
+                "Amane",
+                "Near",
+                "River",
+                "Mello",
+                "Keehl",
+                "Ryuk",
+                "Rem",
+                "Watari",
+                "Matsuda",
+                "Aizawa",
+                "John",
+                "Jane",
+                "Michael",
+                "Sarah",
+                "David",
+                "Lisa",
+                "Chris",
+                "Emma",
+                "Alex",
+                "Anna",
+                "James",
+                "Mary",
+                "Robert",
+                "Patricia",
+                "William",
+                "Jennifer",
+                "Richard",
+                "Linda",
+                "Joseph",
+                "Elizabeth",
+            ].includes(cleanWord)
+        );
     }
 
     // API functions
     async function fetchContent() {
         if (isLoadingContent) return;
-        
+
         isLoadingContent = true;
         contentError = null;
-        
+
         try {
-            const response = await fetch('/api/generate?count=10&wordsPerSentence=12');
-            
+            const response = await fetch(
+                "/api/generate?count=10&wordsPerSentence=12",
+            );
+
             if (!response.ok) {
                 throw new Error(`Failed to fetch content: ${response.status}`);
             }
-            
+
             const data = await response.json();
             sentences = data.sentences;
             specialWords = data.specialWords;
-            
-            console.log('Loaded content:', { 
-                sentenceCount: sentences.length, 
-                specialWordCount: specialWords.length 
+
+            console.log("Loaded content:", {
+                sentenceCount: sentences.length,
+                specialWordCount: specialWords.length,
             });
-            
         } catch (error) {
-            contentError = error instanceof Error ? error.message : 'Failed to load content';
-            console.error('Error fetching content:', error);
-            
+            contentError =
+                error instanceof Error
+                    ? error.message
+                    : "Failed to load content";
+            console.error("Error fetching content:", error);
+
             // Fallback to default content
             sentences = [
                 "I am justice! I protect the innocent and those who fear evil!",
                 "This world is rotten and those who are making it rot deserve to die!",
                 "The real evil is the power to kill people!",
                 "I will reign over a new world as its god!",
-                "Humans are so interesting!"
+                "Humans are so interesting!",
             ];
-            specialWords = ["justice", "god", "death", "evil", "world", "detective"];
+            specialWords = [
+                "justice",
+                "god",
+                "death",
+                "evil",
+                "world",
+                "detective",
+            ];
         } finally {
             isLoadingContent = false;
         }
@@ -201,28 +285,30 @@
 
     function triggerWordRevealAnimation() {
         if (isAnimating) return;
-        
+
         isAnimating = true;
-        
+
         // Calculate starting global index for current sentence
-        const startGlobalIndex = calculateGlobalWordIndex(currentSentenceIndex, 0);
-        
+        const startGlobalIndex = calculateGlobalWordIndex(
+            currentSentenceIndex,
+            0,
+        );
+
         // Animate words with staggered delay
         words.forEach((_, index) => {
             setTimeout(() => {
                 const globalIndex = startGlobalIndex + index;
                 animatedWords = new Set([...animatedWords, globalIndex]);
-                
+
                 // Mark animation as complete when last word is animated
                 if (index === words.length - 1) {
                     //DONT DELETE THIS FUCKING CODE
                     setInterval(() => {
                         isAnimating = false;
-                        
 
                         if (inputElement) {
-                                inputElement.focus();
-                            }
+                            inputElement.focus();
+                        }
                     }, 1000);
                 }
             }, index * 30);
@@ -230,13 +316,14 @@
     }
 
     function startGame() {
+        showRyuk = true;
         gameStarted = true;
         gameCompleted = false;
         showScoreboard = false;
 
         initBook();
         resetGame();
-        
+
         // Fetch content from API before starting
         fetchContent().then(() => {
             // Trigger word reveal animation with a small delay to ensure DOM is ready
@@ -246,8 +333,6 @@
                 startTimer(); // Start the timer after content is loaded
             }, 100);
         });
-
-        
     }
 
     function resetGame() {
@@ -261,13 +346,13 @@
         shakeWords = [];
         strikethroughWords = [];
         isTyping = false;
-        
+
         // Reset timer and game state
         stopTimer();
         timeRemaining = timeLimit;
         gameCompleted = false;
         showScoreboard = false;
-        
+
         // Reset statistics
         correctWords = 0;
         correctNames = 0;
@@ -279,7 +364,7 @@
         lockedContent = "";
         currentTypingWord = "";
         lockedWordPositions = [];
-        
+
         // Reset animation states
         animatedWords = new Set();
         isAnimating = false;
@@ -292,16 +377,17 @@
         currentLine = 0;
     }
 
-    function restartGame(){
+    function restartGame() {
+        showRyuk = true;
         resetGame();
-        
+
         // Fetch content from API before starting
         fetchContent().then(() => {
             // Trigger word reveal animation with a small delay to ensure DOM is ready
             setTimeout(() => {
                 pageFlip.flip(1);
                 triggerWordRevealAnimation();
-                startTimer(); 
+                startTimer();
             }, 100);
         });
     }
@@ -311,7 +397,7 @@
             event.preventDefault();
             return; // Don't allow input if game is over
         }
-        
+
         const target = event.target as HTMLTextAreaElement;
         const newValue = target.value;
 
@@ -404,7 +490,7 @@
         if (gameCompleted || timeRemaining <= 0) {
             return; // Don't process input if game is over
         }
-        
+
         if (currentWord == undefined) {
             // No more words, add space and continue
             currentInput += " ";
@@ -415,21 +501,34 @@
         const cleanWord = currentWord.replace(/[!?.,]/g, "");
         const cleanInput = currentTypingWord.trim().replace(/[!?.,]/g, "");
         const lastTypedWord = cleanInput.split(" ").pop() || "";
-        
+
         totalWordsTyped++;
 
         if (lastTypedWord.toLowerCase() === cleanWord.toLowerCase()) {
             // Correct word - track statistics
             correctWords++;
-            
+
             if (isPersonName(currentWord)) {
                 correctNames++;
+                if (timeoutShowRyukMessage != null) {
+                    clearTimeout(timeoutShowRyukMessage);
+                }
+                ryukBubbleMessage = true;
+                ryukMessage = "Gokil!";
+                timeoutShowRyukMessage = setTimeout(() => {
+                    ryukBubbleMessage = false;
+                    timeoutShowRyukMessage = null;
+                }, 5000);
+            } else {
+                if (timeoutShowRyukMessage == null) {
+                    showRyukMessage();
+                }
             }
-            
+
             if (isCurrentWordSpecial) {
                 correctSpecialWords++;
             }
-            
+
             // Correct word - lock it
             lockedWords.add(globalWordIndex);
             strikethroughWords = [...strikethroughWords, globalWordIndex];
@@ -500,16 +599,18 @@
             // No sentences available, fetch more content
             fetchContent().then(() => {
                 if (sentences.length > 0) {
-                    currentSentenceIndex = (currentSentenceIndex + 1) % sentences.length;
+                    currentSentenceIndex =
+                        (currentSentenceIndex + 1) % sentences.length;
                     triggerWordRevealAnimation();
                 }
             });
             return;
         }
-        
+
         currentSentenceIndex = (currentSentenceIndex + 1) % sentences.length;
         currentWordIndex = 0;
-        strikethroughWords = [];
+        // DON'T reset strikethroughWords - keep the line-through effects for previous words
+        // strikethroughWords = [];
 
         // Keep the existing input content and add a space separator
         if (currentInput.trim().length > 0) {
@@ -524,6 +625,7 @@
         // currentTypingWord = "";
         // lockedWordPositions = [];
         // currentInput = "";
+        // strikethroughWords = []; // <- This was causing the issue!
 
         // Reset only the current typing word for the new sentence
         currentTypingWord = "";
@@ -603,12 +705,18 @@
                                     Mistakes
                                 </div>
                             </div>
-                            <div class="text-center">
-                                <div class="text-2xl font-bold" class:text-red-500={timeRemaining <= 10} class:text-blue-500={timeRemaining > 10}>
-                                    {timeRemaining}s
-                                </div>
-                                <div class="text-sm text-gray-400">Time</div>
+                        </div>
+
+                        <div class="text-center death-font">
+                            <div
+                                class="font-bold"
+                                class:text-red-500={timeRemaining <= 10}
+                                class:text-yellow-500={timeRemaining > 10}
+                            >
+                                <span class="text-4xl">{timeRemaining}</span
+                                ><small>s</small>
                             </div>
+                            <div class="text-sm text-gray-400">Time</div>
                         </div>
 
                         <button
@@ -625,89 +733,105 @@
                             class="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto"
                         >
                             {#each words as word, index}
-                                {@const globalIndex = calculateGlobalWordIndex(currentSentenceIndex, index)}
-                                <div class:animate-shake={shakeWords.includes(
+                                {@const globalIndex = calculateGlobalWordIndex(
+                                    currentSentenceIndex,
+                                    index,
+                                )}
+                                <div
+                                    class:animate-shake={shakeWords.includes(
                                         globalIndex,
-                                    )}>
-                                    <div
-                                    class="relative"
-                                    
-                                    class:animate-fadeInBounce={animatedWords.has(globalIndex)}
-                                    
-                                    class:word-hidden={!animatedWords.has(globalIndex)}
-                                    style="animation-delay: {index * 30}ms;"
+                                    )}
                                 >
-                                    <!-- Paper clipping background -->
                                     <div
-                                        class="px-4 py-2 transform -rotate-2 shadow-lg relative clip-paper transition-all duration-300"
-                                        class:bg-red-600={specialWords.includes(
-                                            word
-                                                .toLowerCase()
-                                                .replace(/[!?.,]/g, ""),
+                                        class="relative"
+                                        class:animate-fadeInBounce={animatedWords.has(
+                                            globalIndex,
                                         )}
-                                        class:bg-gray-200={!specialWords.includes(
-                                            word
-                                                .toLowerCase()
-                                                .replace(/[!?.,]/g, ""),
-                                        ) && !lockedWords.has(globalIndex)}
-                                        class:bg-black={lockedWords.has(
+                                        class:word-hidden={!animatedWords.has(
                                             globalIndex,
-                                        ) &&
-                                            !specialWords.includes(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            )}
-                                        class:bg-red-900={lockedWords.has(
-                                            globalIndex,
-                                        ) &&
-                                            specialWords.includes(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            )}
-                                        class:text-white={specialWords.includes(
-                                            word
-                                                .toLowerCase()
-                                                .replace(/[!?.,]/g, ""),
-                                        ) || lockedWords.has(globalIndex)}
-                                        class:text-black={!specialWords.includes(
-                                            word
-                                                .toLowerCase()
-                                                .replace(/[!?.,]/g, ""),
-                                        ) && !lockedWords.has(globalIndex)}
-                                        class:animate-pulse={index ===
-                                            currentWordIndex}
-                                            style="transform: rotate({Math.floor(Math.random() * 11) - 5}deg);"
+                                        )}
+                                        style="animation-delay: {index * 30}ms;"
                                     >
-                                        <span
-                                            class="relative text-2xl font-bold"
-                                            class:line-through={strikethroughWords.includes(
-                                                index,
+                                        <!-- Paper clipping background -->
+                                        <div
+                                            class="px-4 py-2 transform -rotate-2 shadow-lg relative clip-paper transition-all duration-300"
+                                            class:bg-red-600={specialWords.includes(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
                                             )}
-                                            class:text-current={index !==
-                                                currentWordIndex}
-                                            class:text-red-600={index ===
-                                                currentWordIndex &&
+                                            class:bg-gray-200={!specialWords.includes(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
+                                            ) && !lockedWords.has(globalIndex)}
+                                            class:bg-black={lockedWords.has(
+                                                globalIndex,
+                                            ) &&
                                                 !specialWords.includes(
                                                     word
                                                         .toLowerCase()
                                                         .replace(/[!?.,]/g, ""),
                                                 )}
-                                            class:text-yellow-200={index ===
-                                                currentWordIndex &&
+                                            class:bg-red-900={lockedWords.has(
+                                                globalIndex,
+                                            ) &&
                                                 specialWords.includes(
                                                     word
                                                         .toLowerCase()
                                                         .replace(/[!?.,]/g, ""),
                                                 )}
+                                            class:text-white={specialWords.includes(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
+                                            ) || lockedWords.has(globalIndex)}
+                                            class:text-black={!specialWords.includes(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
+                                            ) && !lockedWords.has(globalIndex)}
                                             class:animate-pulse={index ===
                                                 currentWordIndex}
+                                            style="transform: rotate({Math.floor(
+                                                Math.random() * 11,
+                                            ) - 5}deg);"
                                         >
-                                            {word}
-                                        </span>
+                                            <span
+                                                class="relative text-2xl font-bold"
+                                                style="text-decoration-color:white;"
+                                                class:line-through={strikethroughWords.includes(
+                                                    globalIndex,
+                                                )}
+                                                class:text-current={index !==
+                                                    currentWordIndex}
+                                                class:text-red-600={index ===
+                                                    currentWordIndex &&
+                                                    !specialWords.includes(
+                                                        word
+                                                            .toLowerCase()
+                                                            .replace(
+                                                                /[!?.,]/g,
+                                                                "",
+                                                            ),
+                                                    )}
+                                                class:text-yellow-200={index ===
+                                                    currentWordIndex &&
+                                                    specialWords.includes(
+                                                        word
+                                                            .toLowerCase()
+                                                            .replace(
+                                                                /[!?.,]/g,
+                                                                "",
+                                                            ),
+                                                    )}
+                                                class:animate-pulse={index ===
+                                                    currentWordIndex}
+                                            >
+                                                {word}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
                                 </div>
                             {/each}
                         </div>
@@ -840,61 +964,123 @@
                 </button>
             </div>
         {/if}
+
+        {#if ryukBubbleMessage}
+            <div
+                class="fixed right-10 z-50 animate-bounceMessage"
+                style="bottom: 540px; right: 140px;"
+            >
+                <div class="speech-bubble">
+                    {ryukMessage}
+                </div>
+            </div>
+        {/if}
+        {#if showRyuk}
+            <div class="fixed bottom-10 right-10 z-50 animate-ryukShow">
+                <img
+                    src="/images/Ryuk-Shinigami-PNG-HD-Quality.png"
+                    alt=""
+                    style="height: 500px;"
+                />
+            </div>
+        {/if}
     </div>
-    
+
     <!-- Scoreboard Modal -->
     {#if showScoreboard}
-        <div class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" on:click={closeScoreboard}>
-            <div class="bg-gradient-to-b from-gray-800 to-gray-900 p-8 rounded-lg shadow-2xl max-w-md w-full mx-4 border border-red-600" on:click|stopPropagation>
+        <div
+            class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
+            on:click={closeScoreboard}
+        >
+            <div
+                class="relative bg-gradient-to-b from-gray-800 to-gray-900 p-8 rounded-lg shadow-2xl max-w-md w-full mx-4 border border-red-600"
+                on:click|stopPropagation
+            >
                 <div class="text-center mb-6">
-                    <h2 class="text-4xl font-bold text-red-500 mb-2 death-glow">GAME OVER</h2>
-                    <p class="text-gray-300">Time's up! Here are your results:</p>
+                    <h2 class="text-4xl font-bold text-red-500 mb-2 death-glow">
+                        GAME OVER
+                    </h2>
+                    <p class="text-gray-300">
+                        Time's up! Here are your results:
+                    </p>
                 </div>
-                
+
                 <div class="space-y-4 mb-6">
-                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+                    <div
+                        class="flex justify-between items-center py-2 border-b border-gray-700"
+                    >
                         <span class="text-gray-300">Final Score:</span>
-                        <span class="text-3xl font-bold text-red-500">{score}</span>
+                        <span class="text-3xl font-bold text-red-500"
+                            >{score}</span
+                        >
                     </div>
-                    
-                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+
+                    <div
+                        class="flex justify-between items-center py-2 border-b border-gray-700"
+                    >
                         <span class="text-gray-300">Max Combo:</span>
-                        <span class="text-xl font-bold text-yellow-500">{maxCombo}x</span>
+                        <span class="text-xl font-bold text-yellow-500"
+                            >{maxCombo}x</span
+                        >
                     </div>
-                    
-                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+
+                    <div
+                        class="flex justify-between items-center py-2 border-b border-gray-700"
+                    >
                         <span class="text-gray-300">Accuracy:</span>
                         <span class="text-lg font-bold text-green-500">
-                            {totalWordsTyped > 0 ? Math.round((correctWords / totalWordsTyped) * 100) : 0}%
+                            {totalWordsTyped > 0
+                                ? Math.round(
+                                      (correctWords / totalWordsTyped) * 100,
+                                  )
+                                : 0}%
                         </span>
                     </div>
-                    
-                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+
+                    <div
+                        class="flex justify-between items-center py-2 border-b border-gray-700"
+                    >
                         <span class="text-gray-300">Words Typed:</span>
-                        <span class="text-lg font-bold text-blue-500">{totalWordsTyped}</span>
+                        <span class="text-lg font-bold text-blue-500"
+                            >{totalWordsTyped}</span
+                        >
                     </div>
-                    
-                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+
+                    <div
+                        class="flex justify-between items-center py-2 border-b border-gray-700"
+                    >
                         <span class="text-gray-300">Correct Words:</span>
-                        <span class="text-lg font-bold text-green-500">{correctWords}</span>
+                        <span class="text-lg font-bold text-green-500"
+                            >{correctWords}</span
+                        >
                     </div>
-                    
-                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+
+                    <div
+                        class="flex justify-between items-center py-2 border-b border-gray-700"
+                    >
                         <span class="text-gray-300">Correct Names:</span>
-                        <span class="text-lg font-bold text-purple-500">{correctNames}</span>
+                        <span class="text-lg font-bold text-purple-500"
+                            >{correctNames}</span
+                        >
                     </div>
-                    
-                    <div class="flex justify-between items-center py-2 border-b border-gray-700">
+
+                    <div
+                        class="flex justify-between items-center py-2 border-b border-gray-700"
+                    >
                         <span class="text-gray-300">Special Words:</span>
-                        <span class="text-lg font-bold text-orange-500">{correctSpecialWords}</span>
+                        <span class="text-lg font-bold text-orange-500"
+                            >{correctSpecialWords}</span
+                        >
                     </div>
-                    
+
                     <div class="flex justify-between items-center py-2">
                         <span class="text-gray-300">Mistakes:</span>
-                        <span class="text-lg font-bold text-red-400">{mistakes}</span>
+                        <span class="text-lg font-bold text-red-400"
+                            >{mistakes}</span
+                        >
                     </div>
                 </div>
-                
+
                 <div class="flex space-x-4">
                     <button
                         on:click={startGame}
@@ -908,6 +1094,19 @@
                     >
                         Close
                     </button>
+                </div>
+                <div
+                    class="absolute right-10 top-30 w-auto z-50 animate-ryukShow"
+                    style="right: -70%;"
+                >
+                    <div class="absolute" style="top:-100px; right: 100px;">
+                        <div class="speech-bubble">Gokil</div>
+                    </div>
+                    <img
+                        src="/images/Ryuk-Shinigami-PNG-HD-Quality.png"
+                        alt=""
+                        style="height: 500px;"
+                    />
                 </div>
             </div>
         </div>
@@ -1005,5 +1204,40 @@
 
     .animate-pulse {
         animation: pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes ryukShow {
+        0% {
+            opacity: 0;
+            transform: translateY(-40px);
+        }
+        50% {
+            opacity: 1;
+            transform: translateY(20px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0px);
+        }
+    }
+
+    .animate-ryukShow {
+        animation: ryukShow 1s ease-in-out;
+    }
+
+    @keyframes bounceMessage {
+        0% {
+            opacity: 0;
+            transform: scale(0.6);
+        }
+
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    .animate-bounceMessage {
+        animation: bounceMessage 200ms ease-in-out;
     }
 </style>
