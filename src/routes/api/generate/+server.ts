@@ -22,11 +22,14 @@ const PERSON_NAMES = [
     "Bahlil Lahadalia",
     "Ario Bimo Nandito Ariotedjo (Dito Ariotedjo)",
     "Rini Widyantini",
-    "Sri Mulyani"
+    "Sri Mulyani",
+    "Fufufafa",
+    "Gibran",
+    "Prabowo"
 ];
 
 const SPECIAL_WORDS = [
-    'dpr','komdigi','kemenag','kemendagri','kementerian kesehatan','kementerian keuangan', 'kementerian pendidikan dan kebudayaan','bumn','presiden'
+    'PPATK','WAMI','DPR','KOMDIGI','KEMENAG','KEMENDAGRI','BUMN','PRESIDEN','death', 'note', 'notebook', 'shinigami', 'kira', 'justice', 'god', 'detective', 'wisdom', 'knowledge', 'intelligence', 'strategy', 'mystery', 'secret', 'truth', 'power', 'control', 'strength', 'courage', 'master'
 ];
 
 interface GeneratedContent {

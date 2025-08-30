@@ -35,6 +35,8 @@
     let correctNames = 0;
     let correctSpecialWords = 0;
     let totalWordsTyped = 0;
+    let typingStartTime: number | null = null; // Track when typing actually started
+    let typingEndTime: number | null = null; // Track when typing ended
 
     // Page state
     let currentPageIndex = 1; // Start from page 1 (0 is cover)
@@ -77,6 +79,15 @@
         currentSentenceIndex,
         currentWordIndex,
     );
+    
+    // Calculate WPS (Words Per Second)
+    $: wps = (() => {
+        if (typingStartTime && typingEndTime && correctWords > 0) {
+            const typingTimeInSeconds = (typingEndTime - typingStartTime) / 1000;
+            return Math.round((correctWords / typingTimeInSeconds) * 100) / 100; // Round to 2 decimal places
+        }
+        return 0;
+    })();
 
     let pageFlip: PageFlip.PageFlip;
     let inputElement: HTMLTextAreaElement;
@@ -147,6 +158,11 @@
         gameCompleted = true;
         showScoreboard = true;
         gameStarted = false;
+
+        // Record typing end time for WPS calculation
+        if (typingStartTime !== null) {
+            typingEndTime = Date.now();
+        }
 
         if (timeoutShowRyukMessage != null) {
             clearTimeout(timeoutShowRyukMessage);
@@ -357,6 +373,8 @@
         correctNames = 0;
         correctSpecialWords = 0;
         totalWordsTyped = 0;
+        typingStartTime = null;
+        typingEndTime = null;
 
         // Reset word locking states
         lockedWords = new Set();
@@ -417,6 +435,10 @@
 
         if (!isTyping && currentInput.length > 0) {
             isTyping = true;
+            // Start tracking typing time when user first starts typing
+            if (typingStartTime === null) {
+                typingStartTime = Date.now();
+            }
         }
 
         // Auto-grow the textarea
@@ -1123,6 +1145,15 @@
                                       (correctWords / totalWordsTyped) * 100,
                                   )
                                 : 0}%
+                        </span>
+                    </div>
+
+                    <div
+                        class="flex justify-between items-center py-2 border-b border-gray-700"
+                    >
+                        <span class="text-gray-300">WPS:</span>
+                        <span class="text-lg font-bold text-cyan-500">
+                            {wps} words/sec
                         </span>
                     </div>
 
