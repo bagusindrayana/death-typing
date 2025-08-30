@@ -840,7 +840,7 @@
                                                     word
                                                         .toLowerCase()
                                                         .replace(/[!?.,]/g, ""),
-                                                ) || personNames.includes(
+                                                ) || isPersonName(
                                                     word
                                                         .toLowerCase()
                                                         .replace(/[!?.,]/g, ""),
@@ -858,7 +858,11 @@
                                                 word
                                                     .toLowerCase()
                                                     .replace(/[!?.,]/g, ""),
-                                            ) && !lockedWords.has(globalIndex)}
+                                            ) && !lockedWords.has(globalIndex) && !isPersonName(
+                                                word
+                                                    .toLowerCase()
+                                                    .replace(/[!?.,]/g, ""),
+                                            )}
                                             class:animate-pulse={index ===
                                                 currentWordIndex}
                                             style="transform: rotate({Math.floor(
@@ -876,6 +880,13 @@
                                                 class:text-red-600={index ===
                                                     currentWordIndex &&
                                                     !specialWords.includes(
+                                                        word
+                                                            .toLowerCase()
+                                                            .replace(
+                                                                /[!?.,]/g,
+                                                                "",
+                                                            ),
+                                                    ) && !isPersonName(
                                                         word
                                                             .toLowerCase()
                                                             .replace(

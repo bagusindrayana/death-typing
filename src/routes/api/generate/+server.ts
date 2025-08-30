@@ -8,12 +8,25 @@ const COMMON_WORDS = [
 ];
 
 const PERSON_NAMES = [
-    'Light Yagami', 'L Lawliet', 'Misa Amane', 'Near River', 'Mello Keehl', 'Ryuk', 'Rem', 'Watari', 'Matsuda', 'Aizawa',
-    'John Smith', 'Jane Doe', 'Michael Johnson', 'Sarah Williams', 'David Brown', 'Lisa Jones', 'Chris Garcia', 'Emma Miller', 'Alex Davis', 'Anna Rodriguez'
+    "Satori",
+    "Eko Patrio",
+    "Uya Kuya",
+    "Heri Gunawan",
+    "Ahmad Sahroni",
+    "Immanuel Ebenezer Gerungan (Noel Ebenezer)",
+    "Yusril Ihza Mahendra",
+    "Yandri Susanto",
+    "Natalius Pigai",
+    "Teddy Indra Widaya",
+    "Giring Ganesha",
+    "Bahlil Lahadalia",
+    "Ario Bimo Nandito Ariotedjo (Dito Ariotedjo)",
+    "Rini Widyantini",
+    "Sri Mulyani"
 ];
 
 const SPECIAL_WORDS = [
-    'death', 'note', 'notebook', 'shinigami', 'kira', 'justice', 'god', 'detective', 'wisdom', 'knowledge', 'intelligence', 'strategy', 'mystery', 'secret', 'truth', 'power', 'control', 'strength', 'courage', 'master'
+    'dpr','komdigi','kemenag','kemendagri','kementerian kesehatan','kementerian keuangan', 'kementerian pendidikan dan kebudayaan','bumn','presiden'
 ];
 
 interface GeneratedContent {
