@@ -868,7 +868,7 @@
                         </div>
 
                         <div
-                            class="fixed top-10 left-0 right-0 text-center death-font"
+                            class="fixed top-10 left-0 right-0 text-center death-font w-24 mx-auto"
                         >
                             <div
                                 class="font-bold"
