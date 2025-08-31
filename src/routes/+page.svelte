@@ -8,6 +8,7 @@
     let isLoadingContent = false;
     let contentError: string | null = null;
     let isInitialLoading = true;
+    let currentWordCompleate = 0;
 
     // Game state
     let currentSentenceIndex = 0;
@@ -21,7 +22,7 @@
     let gameStarted = false;
 
     // Timer and game completion
-    let timeLimit = 60;
+    let timeLimit = 360;
     let timeRemaining = timeLimit;
     let gameTimer: number | null = null;
     let gameCompleted = false;
@@ -39,7 +40,6 @@
     let currentPageIndex = 1; // Start from page 1 (0 is cover)
     let currentPageSide: "left" | "right" = "left";
     let pageContents: string[] = [];
-    let typedContent = "";
     let currentLine = 0;
     let maxLinesPerPage = 16;
     let previousHeight = 0;
@@ -63,9 +63,16 @@
     let animatedWords: Set<number> = new Set();
     let isAnimating = false;
 
-    // Reactive statements
+    // Reactive statements with safeguards
     $: currentSentence = sentences[currentSentenceIndex] || "";
     $: words = currentSentence ? currentSentence.split(" ") : [];
+    $: {
+        // Ensure currentWordIndex doesn't exceed words array length
+        if (currentWordCompleate >= words.length && words.length > 0) {
+            console.warn(`Word index ${currentWordIndex} exceeds words length ${words.length}, resetting to trigger next sentence`);
+            nextSentence();
+        }
+    }
     $: currentWord = words[currentWordIndex];
     $: isCurrentWordSpecial =
         currentWord != undefined &&
@@ -362,7 +369,6 @@
         currentPageIndex = 1;
         pageContents = [];
         currentPageSide = "left";
-        typedContent = "";
         currentLine = 0;
     }
 
@@ -438,7 +444,6 @@
     function addLineBreak() {
         // Store the current line content
         const lineContent = currentInput.trim();
-        console.log(lineContent);
 
         pageContents[currentPageIndex - 1] = lineContent;
 
@@ -469,6 +474,13 @@
             return; // Don't process input if game is over
         }
 
+        // Additional safeguard: check if we're beyond the current sentence
+        if (currentWordCompleate >= words.length) {
+            console.warn(`Word index ${currentWordIndex} >= words length ${words.length}, moving to next sentence`);
+            nextSentence();
+            return;
+        }
+
         if (currentWord == undefined) {
             // No more words, add space and continue
             currentInput += " ";
@@ -481,9 +493,11 @@
         const lastTypedWord = cleanInput.split(" ").pop() || "";
 
         totalWordsTyped++;
+      
 
         if (lastTypedWord.toLowerCase() === cleanWord.toLowerCase()) {
             correctWords++;
+            currentWordCompleate ++;
             if (isPersonName(currentWord)) {
                 correctNames++;
                 if (timeoutShowRyukMessage != null) {
@@ -539,8 +553,10 @@
             maxCombo = Math.max(maxCombo, combo);
 
             currentWordIndex++;
-
-            if (currentWordIndex >= words.length) {
+            
+            // Robust check to ensure we move to next sentence
+            // Handle edge cases where currentWordIndex might not match exactly
+            if (currentWordCompleate >= words.length || currentWordCompleate >= currentSentence.split(" ").length) {
                 nextSentence();
             }
         } else {
@@ -564,11 +580,15 @@
     }
 
     function nextSentence() {
+        currentWordCompleate = 0;
+        console.log(`Moving to next sentence. Current: ${currentSentenceIndex}, Word: ${currentWordIndex}/${words.length}`);
+        
         if (sentences.length === 0) {
             fetchContent().then(() => {
                 if (sentences.length > 0) {
                     currentSentenceIndex =
                         (currentSentenceIndex + 1) % sentences.length;
+                    currentWordIndex = 0; // Ensure reset
                     triggerWordRevealAnimation();
                 }
             });
@@ -576,7 +596,7 @@
         }
 
         currentSentenceIndex = (currentSentenceIndex + 1) % sentences.length;
-        currentWordIndex = 0;
+        currentWordIndex = 0; // Always reset to 0 for new sentence
 
         if (currentInput.trim().length > 0) {
             currentInput += " ";
@@ -584,21 +604,34 @@
         }
 
         currentTypingWord = "";
-
+        
+        console.log(`Next sentence set. New: ${currentSentenceIndex}, Word reset to: ${currentWordIndex}`);
         triggerWordRevealAnimation();
     }
 
     function flipToNextPage() {
+        const oldPageIndex = currentPageIndex;
         currentPageIndex += 1;
-
+        pageFlip.flip(currentPageIndex);
         setTimeout(() => {
-            pageFlip.flip(currentPageIndex);
+           
 
             // Reset for new page
-            pageContents = [];
             currentPageSide = "left";
             currentLine = 0;
-            currentInput = "";
+
+            if(isTyping){
+                const lastInput = currentInput.split(" ")[currentInput.split(" ").length - 1];
+                const lastTypedWord = currentTypingWord.split(" ")[currentTypingWord.split(" ").length - 1];
+                currentInput = lastInput;
+                currentTypingWord = lastTypedWord;
+                pageContents[oldPageIndex].replace(" "+lastInput,"")
+            } else {
+                currentInput = "";
+                currentTypingWord = "";
+            }
+            
+            lockedContent = "";
             if (inputElement) {
                 inputElement.style.height = "auto";
                 inputElement.focus();
@@ -1006,27 +1039,30 @@
                     {/if}
                 </button>
             </div>
-        {/if}
-
-        {#if ryukBubbleMessage}
-            <div
-                class="fixed right-10 z-50 animate-bounceMessage"
-                style="bottom: 540px; right: 140px;"
-            >
-                <div class="speech-bubble">
-                    {ryukMessage}
+        {:else}
+            {#if ryukBubbleMessage}
+                <div
+                    class="fixed right-10 z-50 animate-bounceMessage"
+                    style="bottom: 540px; right: 140px;"
+                >
+                    <div class="speech-bubble">
+                        {ryukMessage}
+                    </div>
                 </div>
-            </div>
+            {/if}
+            {#if showRyuk}
+                <div class="fixed bottom-10 right-10 z-50 animate-ryukShow">
+                    <img
+                        src="/images/Ryuk-Shinigami-PNG-HD-Quality.png"
+                        alt=""
+                        style="height: 500px;"
+                    />
+                </div>
+            {/if}
         {/if}
-        {#if showRyuk}
-            <div class="fixed bottom-10 right-10 z-50 animate-ryukShow">
-                <img
-                    src="/images/Ryuk-Shinigami-PNG-HD-Quality.png"
-                    alt=""
-                    style="height: 500px;"
-                />
-            </div>
-        {/if}
+        
+
+        
     </div>
 
     <!-- Scoreboard Modal -->
