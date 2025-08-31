@@ -67,15 +67,18 @@
     }[] = [];
 
     // Animation states
-    let animatedWords: Set<number> = new Set();
-    let isAnimating = false;
+    let isAnimating = true;
 
     // Reactive statements with safeguards
     $: currentSentence = sentences[currentSentenceIndex] || "";
     $: words = currentSentence ? currentSentence.split(" ") : [];
     $: {
         // Ensure currentWordIndex doesn't exceed words array length
-        if (currentWordCompleate >= words.length && words.length > 0) {
+        if (
+            (currentWordCompleate >= words.length ||
+                currentWordIndex >= words.length) &&
+            words.length > 0
+        ) {
             console.warn(
                 `Word index ${currentWordIndex} exceeds words length ${words.length}, resetting to trigger next sentence`,
             );
@@ -85,7 +88,7 @@
     $: currentWord = words[currentWordIndex];
     $: isCurrentWordSpecial =
         currentWord != undefined &&
-        specialWords.includes(currentWord.toLowerCase().replace(/[!?.,]/g, ""));
+        specialWords.includes(currentWord.replace(/[!?.,]/g, ""));
     $: globalWordIndex = calculateGlobalWordIndex(
         currentSentenceIndex,
         currentWordIndex,
@@ -113,20 +116,26 @@
         en: [
             "That's not how the book works",
             "That's not how you use it",
-            "That's not how it works"
-        ]
+            "That's not how it works",
+        ],
     };
 
     let showRyuk = false;
     let ryukMessage =
-        ryukMessages[selectedLanguage][Math.floor(Math.random() * ryukMessages[selectedLanguage].length)];
+        ryukMessages[selectedLanguage][
+            Math.floor(Math.random() * ryukMessages[selectedLanguage].length)
+        ];
     let ryukBubbleMessage = false;
     let timeoutShowRyukMessage: any = null;
 
     function showRyukMessage() {
         ryukBubbleMessage = true;
         ryukMessage =
-            ryukMessages[selectedLanguage][Math.floor(Math.random() * ryukMessages[selectedLanguage].length)];
+            ryukMessages[selectedLanguage][
+                Math.floor(
+                    Math.random() * ryukMessages[selectedLanguage].length,
+                )
+            ];
         timeoutShowRyukMessage = setTimeout(() => {
             ryukBubbleMessage = false;
             timeoutShowRyukMessage = null;
@@ -214,7 +223,8 @@
             clearTimeout(timeoutShowRyukMessage);
         }
         ryukBubbleMessage = true;
-        ryukMessage = selectedLanguage == "id" ? "Gokil!" : "Holy sh*t you right";
+        ryukMessage =
+            selectedLanguage == "id" ? "Gokil!" : "Holy sh*t you right";
         timeoutShowRyukMessage = setTimeout(() => {
             ryukBubbleMessage = false;
             timeoutShowRyukMessage = null;
@@ -350,33 +360,13 @@
     }
 
     function triggerWordRevealAnimation() {
-        if (isAnimating) return;
-
         isAnimating = true;
+        
+        setTimeout(()=>{
+            isAnimating = false;
+        },200)
 
-        const startGlobalIndex = calculateGlobalWordIndex(
-            currentSentenceIndex,
-            0,
-        );
-
-        // Animate words with staggered delay
-        words.forEach((_, index) => {
-            setTimeout(() => {
-                const globalIndex = startGlobalIndex + index;
-                animatedWords = new Set([...animatedWords, globalIndex]);
-
-                // Mark animation as complete when last word is animated
-                if (index === words.length - 1) {
-                    setInterval(() => {
-                        isAnimating = false;
-
-                        if (inputElement) {
-                            inputElement.focus();
-                        }
-                    }, 1000);
-                }
-            }, index * 30);
-        });
+     
     }
 
     function startGame() {
@@ -392,14 +382,24 @@
                 setTimeout(() => {
                     pageFlip.flip(1);
                     triggerWordRevealAnimation();
-                    startTimer();
+                    setTimeout(() => {
+                        startTimer();
+                        if (inputElement) {
+                            inputElement.focus();
+                        }
+                    }, 1000);
                 }, 100);
             });
         } else {
             setTimeout(() => {
                 pageFlip.flip(1);
                 triggerWordRevealAnimation();
-                startTimer();
+                setTimeout(() => {
+                        startTimer();
+                        if (inputElement) {
+                            inputElement.focus();
+                        }
+                    }, 1000);
             }, 100);
         }
     }
@@ -432,8 +432,7 @@
         currentTypingWord = "";
         lockedWordPositions = [];
 
-        animatedWords = new Set();
-        isAnimating = false;
+        isAnimating = true;
 
         currentPageIndex = 1;
         pageContents = [];
@@ -450,7 +449,12 @@
             setTimeout(() => {
                 pageFlip.flip(1);
                 triggerWordRevealAnimation();
-                startTimer();
+                setTimeout(() => {
+                        startTimer();
+                        if (inputElement) {
+                            inputElement.focus();
+                        }
+                    }, 1000);
             }, 100);
         });
     }
@@ -523,7 +527,20 @@
             if (currentPageSide === "left") {
                 currentPageSide = "right";
                 currentLine = 0;
-                currentInput = "";
+                if (isTyping) {
+                    const lastInput =
+                        currentInput.split(" ")[currentInput.split(" ").length - 1];
+                    const lastTypedWord =
+                        currentTypingWord.split(" ")[
+                            currentTypingWord.split(" ").length - 1
+                        ];
+                    console.log(lastInput,lastTypedWord);
+                    currentInput = lastInput;
+                    currentTypingWord = lastTypedWord;
+                } else {
+                    currentInput = "";
+                    currentTypingWord = "";
+                }
                 lockedContent = "";
                 currentPageIndex += 1;
             } else {
@@ -544,7 +561,10 @@
         }
 
         // Additional safeguard: check if we're beyond the current sentence
-        if (currentWordCompleate >= words.length) {
+        if (
+            currentWordCompleate >= words.length ||
+            currentWordIndex >= words.length
+        ) {
             console.warn(
                 `Word index ${currentWordIndex} >= words length ${words.length}, moving to next sentence`,
             );
@@ -574,7 +594,8 @@
                     clearTimeout(timeoutShowRyukMessage);
                 }
                 ryukBubbleMessage = true;
-                ryukMessage = selectedLanguage == "id" ? "Gokil!" : "Holy sh*t you right";
+                ryukMessage =
+                    selectedLanguage == "id" ? "Gokil!" : "Holy sh*t you right";
                 timeoutShowRyukMessage = setTimeout(() => {
                     ryukBubbleMessage = false;
                     timeoutShowRyukMessage = null;
@@ -628,7 +649,9 @@
             // Handle edge cases where currentWordIndex might not match exactly
             if (
                 currentWordCompleate >= words.length ||
-                currentWordCompleate >= currentSentence.split(" ").length
+                currentWordCompleate >= currentSentence.split(" ").length ||
+                currentWordIndex >= words.length ||
+                currentWordIndex >= currentSentence.split(" ").length
             ) {
                 nextSentence();
             }
@@ -653,6 +676,7 @@
     }
 
     function nextSentence() {
+        currentSentence = "";
         currentWordCompleate = 0;
         console.log(
             `Moving to next sentence. Current: ${currentSentenceIndex}, Word: ${currentWordIndex}/${words.length}`,
@@ -671,12 +695,7 @@
         }
 
         currentSentenceIndex = (currentSentenceIndex + 1) % sentences.length;
-        currentWordIndex = 0; // Always reset to 0 for new sentence
-
-        if (currentInput.trim().length > 0) {
-            currentInput += " ";
-            lockedContent += " ";
-        }
+        currentWordIndex = 0;
 
         currentTypingWord = "";
 
@@ -694,7 +713,7 @@
             // Reset for new page
             currentPageSide = "left";
             currentLine = 0;
-
+            
             if (isTyping) {
                 const lastInput =
                     currentInput.split(" ")[currentInput.split(" ").length - 1];
@@ -711,10 +730,13 @@
             }
 
             lockedContent = "";
-            if (inputElement) {
-                inputElement.style.height = "auto";
-                inputElement.focus();
-            }
+            setTimeout(()=>{
+                console.log(inputElement);
+                if (inputElement) {
+                    inputElement.style.height = "auto";
+                    inputElement.focus();
+                }
+            },200)
         }, 800);
     }
 
@@ -868,69 +890,32 @@
                     </div>
 
                     <!-- Clipping text display -->
-                    <div>
+                    <div class="min-h-[110px]">
                         <div
                             class="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto"
                         >
-                            {#each words as word, index}
-                                {@const globalIndex = calculateGlobalWordIndex(
-                                    currentSentenceIndex,
-                                    index,
-                                )}
-                                <div
-                                    class:animate-shake={shakeWords.includes(
-                                        globalIndex,
-                                    )}
-                                >
+                            {#if !isAnimating}
+                                {#each words as word, index}
+                                    {@const globalIndex =
+                                        calculateGlobalWordIndex(
+                                            currentSentenceIndex,
+                                            index,
+                                        )}
                                     <div
-                                        class="relative"
-                                        class:animate-fadeInBounce={animatedWords.has(
+                                        class:animate-shake={shakeWords.includes(
                                             globalIndex,
                                         )}
-                                        class:word-hidden={!animatedWords.has(
-                                            globalIndex,
-                                        )}
-                                        style="animation-delay: {index * 30}ms;"
                                     >
-                                        <!-- Paper clipping background -->
                                         <div
-                                            class="px-4 py-2 transform -rotate-2 shadow-lg relative clip-paper transition-all duration-300"
-                                            class:bg-red-600={specialWords.includes(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            ) ||
-                                                isPersonName(
-                                                    word
-                                                        .toLowerCase()
-                                                        .replace(/[!?.,]/g, ""),
-                                                )}
-                                            class:bg-gray-200={!specialWords.includes(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            ) &&
-                                                !lockedWords.has(globalIndex) &&
-                                                !isPersonName(
-                                                    word
-                                                        .toLowerCase()
-                                                        .replace(/[!?.,]/g, ""),
-                                                )}
-                                            class:bg-black={lockedWords.has(
-                                                globalIndex,
-                                            ) &&
-                                                !specialWords.includes(
-                                                    word
-                                                        .toLowerCase()
-                                                        .replace(/[!?.,]/g, ""),
-                                                )}
-                                            class:bg-red-900={lockedWords.has(
-                                                globalIndex,
-                                            ) &&
-                                                (specialWords.includes(
-                                                    word
-                                                        .toLowerCase()
-                                                        .replace(/[!?.,]/g, ""),
+                                            class="relative animate-fadeInBounce"
+                                            style="opacity: 0; animation-delay: {index *
+                                                30}ms;"
+                                        >
+                                            <!-- Paper clipping background -->
+                                            <div
+                                                class="px-4 py-2 transform -rotate-2 shadow-lg relative clip-paper transition-all duration-300"
+                                                class:bg-red-600={specialWords.includes(
+                                                    word.replace(/[!?.,]/g, ""),
                                                 ) ||
                                                     isPersonName(
                                                         word
@@ -939,52 +924,12 @@
                                                                 /[!?.,]/g,
                                                                 "",
                                                             ),
-                                                    ))}
-                                            class:text-white={specialWords.includes(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            ) ||
-                                                lockedWords.has(globalIndex) ||
-                                                isPersonName(
-                                                    word
-                                                        .toLowerCase()
-                                                        .replace(/[!?.,]/g, ""),
-                                                )}
-                                            class:text-black={!specialWords.includes(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            ) &&
-                                                !lockedWords.has(globalIndex) &&
-                                                !isPersonName(
-                                                    word
-                                                        .toLowerCase()
-                                                        .replace(/[!?.,]/g, ""),
-                                                )}
-                                            class:animate-pulse={index ===
-                                                currentWordIndex}
-                                            style="transform: rotate({Math.floor(
-                                                Math.random() * 11,
-                                            ) - 5}deg);"
-                                        >
-                                            <span
-                                                class="relative text-2xl font-bold"
-                                                style="text-decoration-color:white;"
-                                                class:line-through={strikethroughWords.includes(
-                                                    globalIndex,
-                                                )}
-                                                class:text-current={index !==
-                                                    currentWordIndex}
-                                                class:text-red-600={index ===
-                                                    currentWordIndex &&
-                                                    !specialWords.includes(
-                                                        word
-                                                            .toLowerCase()
-                                                            .replace(
-                                                                /[!?.,]/g,
-                                                                "",
-                                                            ),
+                                                    )}
+                                                class:bg-gray-200={!specialWords.includes(
+                                                    word.replace(/[!?.,]/g, ""),
+                                                ) &&
+                                                    !lockedWords.has(
+                                                        globalIndex,
                                                     ) &&
                                                     !isPersonName(
                                                         word
@@ -994,9 +939,53 @@
                                                                 "",
                                                             ),
                                                     )}
-                                                class:text-yellow-200={index ===
-                                                    currentWordIndex &&
-                                                    specialWords.includes(
+                                                class:bg-black={lockedWords.has(
+                                                    globalIndex,
+                                                ) &&
+                                                    !specialWords.includes(
+                                                        word.replace(
+                                                            /[!?.,]/g,
+                                                            "",
+                                                        ),
+                                                    )}
+                                                class:bg-red-900={lockedWords.has(
+                                                    globalIndex,
+                                                ) &&
+                                                    (specialWords.includes(
+                                                        word.replace(
+                                                            /[!?.,]/g,
+                                                            "",
+                                                        ),
+                                                    ) ||
+                                                        isPersonName(
+                                                            word
+                                                                .toLowerCase()
+                                                                .replace(
+                                                                    /[!?.,]/g,
+                                                                    "",
+                                                                ),
+                                                        ))}
+                                                class:text-white={specialWords.includes(
+                                                    word.replace(/[!?.,]/g, ""),
+                                                ) ||
+                                                    lockedWords.has(
+                                                        globalIndex,
+                                                    ) ||
+                                                    isPersonName(
+                                                        word
+                                                            .toLowerCase()
+                                                            .replace(
+                                                                /[!?.,]/g,
+                                                                "",
+                                                            ),
+                                                    )}
+                                                class:text-black={!specialWords.includes(
+                                                    word.replace(/[!?.,]/g, ""),
+                                                ) &&
+                                                    !lockedWords.has(
+                                                        globalIndex,
+                                                    ) &&
+                                                    !isPersonName(
                                                         word
                                                             .toLowerCase()
                                                             .replace(
@@ -1006,13 +995,52 @@
                                                     )}
                                                 class:animate-pulse={index ===
                                                     currentWordIndex}
+                                                style="transform: rotate({Math.floor(
+                                                    Math.random() * 11,
+                                                ) - 5}deg);"
                                             >
-                                                {word}
-                                            </span>
+                                                <span
+                                                    class="relative text-2xl font-bold"
+                                                    style="text-decoration-color:white;"
+                                                    class:line-through={strikethroughWords.includes(
+                                                        globalIndex,
+                                                    )}
+                                                    class:text-current={index !==
+                                                        currentWordIndex}
+                                                    class:text-red-600={index ===
+                                                        currentWordIndex &&
+                                                        !specialWords.includes(
+                                                            word.replace(
+                                                                /[!?.,]/g,
+                                                                "",
+                                                            ),
+                                                        ) &&
+                                                        !isPersonName(
+                                                            word
+                                                                .toLowerCase()
+                                                                .replace(
+                                                                    /[!?.,]/g,
+                                                                    "",
+                                                                ),
+                                                        )}
+                                                    class:text-yellow-200={index ===
+                                                        currentWordIndex &&
+                                                        specialWords.includes(
+                                                            word.replace(
+                                                                /[!?.,]/g,
+                                                                "",
+                                                            ),
+                                                        )}
+                                                    class:animate-pulse={index ===
+                                                        currentWordIndex}
+                                                >
+                                                    {word}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            {/each}
+                                {/each}
+                            {/if}
                         </div>
                     </div>
                 </div>
@@ -1335,7 +1363,12 @@
                     style="right: -70%;"
                 >
                     <div class="absolute" style="top:-100px; right: 100px;">
-                        <div class="speech-bubble">{ryukMessage = selectedLanguage == "id" ? "Gokil!" : "Holy sh*t you right"}</div>
+                        <div class="speech-bubble">
+                            {(ryukMessage =
+                                selectedLanguage == "id"
+                                    ? "Gokil!"
+                                    : "Holy sh*t you right")}
+                        </div>
                     </div>
                     <img
                         src="/images/Ryuk-Shinigami-PNG-HD-Quality.png"
