@@ -10,6 +10,13 @@
     let isInitialLoading = true;
     let currentWordCompleate = 0;
 
+    // Language selection
+    let selectedLanguage: "en" | "id" = "en";
+
+    // Mobile detection
+    let isMobile = false;
+    let showMobileWarning = false;
+
     // Game state
     let currentSentenceIndex = 0;
     let currentWordIndex = 0;
@@ -22,7 +29,7 @@
     let gameStarted = false;
 
     // Timer and game completion
-    let timeLimit = 360;
+    let timeLimit = 60;
     let timeRemaining = timeLimit;
     let gameTimer: number | null = null;
     let gameCompleted = false;
@@ -69,7 +76,9 @@
     $: {
         // Ensure currentWordIndex doesn't exceed words array length
         if (currentWordCompleate >= words.length && words.length > 0) {
-            console.warn(`Word index ${currentWordIndex} exceeds words length ${words.length}, resetting to trigger next sentence`);
+            console.warn(
+                `Word index ${currentWordIndex} exceeds words length ${words.length}, resetting to trigger next sentence`,
+            );
             nextSentence();
         }
     }
@@ -81,11 +90,12 @@
         currentSentenceIndex,
         currentWordIndex,
     );
-    
+
     // Calculate WPS (Words Per Second)
     $: wps = (() => {
         if (typingStartTime && typingEndTime && correctWords > 0) {
-            const typingTimeInSeconds = (typingEndTime - typingStartTime) / 1000;
+            const typingTimeInSeconds =
+                (typingEndTime - typingStartTime) / 1000;
             return Math.round((correctWords / typingTimeInSeconds) * 100) / 100; // Round to 2 decimal places
         }
         return 0;
@@ -94,22 +104,29 @@
     let pageFlip: PageFlip.PageFlip;
     let inputElement: HTMLTextAreaElement;
 
-    let ryukMessages = [
-        "Make bukunya bukan begitu",
-        "Bukan begitu cara makenya",
-        "Cara kerjanya bukan begitu",
-    ];
+    let ryukMessages = {
+        id: [
+            "Make bukunya bukan begitu",
+            "Bukan begitu cara makenya",
+            "Cara kerjanya bukan begitu",
+        ],
+        en: [
+            "That's not how the book works",
+            "That's not how you use it",
+            "That's not how it works"
+        ]
+    };
 
     let showRyuk = false;
     let ryukMessage =
-        ryukMessages[Math.floor(Math.random() * ryukMessages.length)];
+        ryukMessages[selectedLanguage][Math.floor(Math.random() * ryukMessages[selectedLanguage].length)];
     let ryukBubbleMessage = false;
     let timeoutShowRyukMessage: any = null;
 
     function showRyukMessage() {
         ryukBubbleMessage = true;
         ryukMessage =
-            ryukMessages[Math.floor(Math.random() * ryukMessages.length)];
+            ryukMessages[selectedLanguage][Math.floor(Math.random() * ryukMessages[selectedLanguage].length)];
         timeoutShowRyukMessage = setTimeout(() => {
             ryukBubbleMessage = false;
             timeoutShowRyukMessage = null;
@@ -130,6 +147,40 @@
         globalIndex += wordIndex;
 
         return globalIndex;
+    }
+
+    function detectMobile(): boolean {
+        // Check user agent for mobile indicators
+        const userAgent = navigator.userAgent.toLowerCase();
+        const mobileKeywords = [
+            "android",
+            "webos",
+            "iphone",
+            "ipad",
+            "ipod",
+            "blackberry",
+            "windows phone",
+            "mobile",
+            "tablet",
+        ];
+
+        const isMobileUserAgent = mobileKeywords.some((keyword) =>
+            userAgent.includes(keyword),
+        );
+
+        // Check screen width (less than 768px is considered mobile)
+        const isMobileScreen = window.innerWidth < 768;
+
+        // Check touch capability
+        const isTouchDevice =
+            "ontouchstart" in window || navigator.maxTouchPoints > 0;
+
+        // Combine checks - if any indicate mobile, consider it mobile
+        return isMobileUserAgent || (isMobileScreen && isTouchDevice);
+    }
+
+    function closeMobileWarning() {
+        showMobileWarning = false;
     }
 
     function startTimer() {
@@ -163,7 +214,7 @@
             clearTimeout(timeoutShowRyukMessage);
         }
         ryukBubbleMessage = true;
-        ryukMessage = "Gokil!";
+        ryukMessage = selectedLanguage == "id" ? "Gokil!" : "Holy sh*t you right";
         timeoutShowRyukMessage = setTimeout(() => {
             ryukBubbleMessage = false;
             timeoutShowRyukMessage = null;
@@ -182,17 +233,19 @@
     function isPersonName(word: string): boolean {
         // Check if the word is a person name using API data
         const cleanWord = word.replace(/[!?.,]/g, "");
-        
+
         const hasCapitalInMiddle = /[A-Z]/.test(cleanWord.slice(1));
-        
-        const isKnownName = personNames.some(name => {
+
+        const isKnownName = personNames.some((name) => {
             if (name.toLowerCase() === cleanWord.toLowerCase()) {
                 return true;
             }
-            const nameParts = name.split(' ');
-            return nameParts.some(part => part.toLowerCase() === cleanWord.toLowerCase());
+            const nameParts = name.split(" ");
+            return nameParts.some(
+                (part) => part.toLowerCase() === cleanWord.toLowerCase(),
+            );
         });
-        
+
         return hasCapitalInMiddle || isKnownName;
     }
 
@@ -205,7 +258,7 @@
 
         try {
             const response = await fetch(
-                "/api/generate?count=10&wordsPerSentence=12",
+                `/api/generate?count=10&wordsPerSentence=12&language=${selectedLanguage}`,
             );
 
             if (!response.ok) {
@@ -247,10 +300,26 @@
             ];
 
             personNames = [
-                "Light Yagami", "L Lawliet", "Misa Amane", "Near River", "Mello Keehl", 
-                "Ryuk", "Rem", "Watari", "Matsuda", "Aizawa",
-                "John Smith", "Jane Doe", "Michael Johnson", "Sarah Williams", "David Brown", 
-                "Lisa Jones", "Chris Garcia", "Emma Miller", "Alex Davis", "Anna Rodriguez"
+                "Light Yagami",
+                "L Lawliet",
+                "Misa Amane",
+                "Near River",
+                "Mello Keehl",
+                "Ryuk",
+                "Rem",
+                "Watari",
+                "Matsuda",
+                "Aizawa",
+                "John Smith",
+                "Jane Doe",
+                "Michael Johnson",
+                "Sarah Williams",
+                "David Brown",
+                "Lisa Jones",
+                "Chris Garcia",
+                "Emma Miller",
+                "Alex Davis",
+                "Anna Rodriguez",
             ];
         } finally {
             isLoadingContent = false;
@@ -476,7 +545,9 @@
 
         // Additional safeguard: check if we're beyond the current sentence
         if (currentWordCompleate >= words.length) {
-            console.warn(`Word index ${currentWordIndex} >= words length ${words.length}, moving to next sentence`);
+            console.warn(
+                `Word index ${currentWordIndex} >= words length ${words.length}, moving to next sentence`,
+            );
             nextSentence();
             return;
         }
@@ -493,18 +564,17 @@
         const lastTypedWord = cleanInput.split(" ").pop() || "";
 
         totalWordsTyped++;
-      
 
         if (lastTypedWord.toLowerCase() === cleanWord.toLowerCase()) {
             correctWords++;
-            currentWordCompleate ++;
+            currentWordCompleate++;
             if (isPersonName(currentWord)) {
                 correctNames++;
                 if (timeoutShowRyukMessage != null) {
                     clearTimeout(timeoutShowRyukMessage);
                 }
                 ryukBubbleMessage = true;
-                ryukMessage = "Gokil!";
+                ryukMessage = selectedLanguage == "id" ? "Gokil!" : "Holy sh*t you right";
                 timeoutShowRyukMessage = setTimeout(() => {
                     ryukBubbleMessage = false;
                     timeoutShowRyukMessage = null;
@@ -553,10 +623,13 @@
             maxCombo = Math.max(maxCombo, combo);
 
             currentWordIndex++;
-            
+
             // Robust check to ensure we move to next sentence
             // Handle edge cases where currentWordIndex might not match exactly
-            if (currentWordCompleate >= words.length || currentWordCompleate >= currentSentence.split(" ").length) {
+            if (
+                currentWordCompleate >= words.length ||
+                currentWordCompleate >= currentSentence.split(" ").length
+            ) {
                 nextSentence();
             }
         } else {
@@ -581,8 +654,10 @@
 
     function nextSentence() {
         currentWordCompleate = 0;
-        console.log(`Moving to next sentence. Current: ${currentSentenceIndex}, Word: ${currentWordIndex}/${words.length}`);
-        
+        console.log(
+            `Moving to next sentence. Current: ${currentSentenceIndex}, Word: ${currentWordIndex}/${words.length}`,
+        );
+
         if (sentences.length === 0) {
             fetchContent().then(() => {
                 if (sentences.length > 0) {
@@ -604,8 +679,10 @@
         }
 
         currentTypingWord = "";
-        
-        console.log(`Next sentence set. New: ${currentSentenceIndex}, Word reset to: ${currentWordIndex}`);
+
+        console.log(
+            `Next sentence set. New: ${currentSentenceIndex}, Word reset to: ${currentWordIndex}`,
+        );
         triggerWordRevealAnimation();
     }
 
@@ -614,23 +691,25 @@
         currentPageIndex += 1;
         pageFlip.flip(currentPageIndex);
         setTimeout(() => {
-           
-
             // Reset for new page
             currentPageSide = "left";
             currentLine = 0;
 
-            if(isTyping){
-                const lastInput = currentInput.split(" ")[currentInput.split(" ").length - 1];
-                const lastTypedWord = currentTypingWord.split(" ")[currentTypingWord.split(" ").length - 1];
+            if (isTyping) {
+                const lastInput =
+                    currentInput.split(" ")[currentInput.split(" ").length - 1];
+                const lastTypedWord =
+                    currentTypingWord.split(" ")[
+                        currentTypingWord.split(" ").length - 1
+                    ];
                 currentInput = lastInput;
                 currentTypingWord = lastTypedWord;
-                pageContents[oldPageIndex].replace(" "+lastInput,"")
+                pageContents[oldPageIndex].replace(" " + lastInput, "");
             } else {
                 currentInput = "";
                 currentTypingWord = "";
             }
-            
+
             lockedContent = "";
             if (inputElement) {
                 inputElement.style.height = "auto";
@@ -641,18 +720,25 @@
 
     onMount(async () => {
         try {
+            // Detect mobile device
+            isMobile = detectMobile();
+            if (isMobile) {
+                showMobileWarning = true;
+                return; // Don't initialize the game on mobile
+            }
+
             // Initialize the book
             initBook();
-            
-            // Fetch initial content to prepare the app
-            await fetchContent();
-            
+
+            // // Fetch initial content to prepare the app
+            // await fetchContent();
+
             // Small delay to ensure smooth transition
             setTimeout(() => {
                 isInitialLoading = false;
             }, 800);
         } catch (error) {
-            console.error('Error during app initialization:', error);
+            console.error("Error during app initialization:", error);
             // Even if there's an error, hide the loading screen
             setTimeout(() => {
                 isInitialLoading = false;
@@ -675,20 +761,33 @@
 
     <!-- Initial Loading Screen -->
     {#if isInitialLoading}
-        <div class="fixed inset-0 bg-gradient-to-b from-gray-900 via-gray-800 to-black z-50 flex items-center justify-center">
+        <div
+            class="fixed inset-0 bg-gradient-to-b from-gray-900 via-gray-800 to-black z-50 flex items-center justify-center"
+        >
             <div class="text-center space-y-8">
                 <!-- Death Note Logo/Title -->
-                <div class="death-font text-6xl md:text-8xl font-bold text-red-500 death-glow mb-8">
+                <div
+                    class="death-font text-6xl md:text-8xl font-bold text-red-500 death-glow mb-8"
+                >
                     Death Typing
                 </div>
-                
+
                 <!-- Loading Animation -->
                 <div class="flex justify-center items-center space-x-2">
-                    <div class="w-4 h-4 bg-red-500 rounded-full animate-bounce" style="animation-delay: 0ms;"></div>
-                    <div class="w-4 h-4 bg-red-500 rounded-full animate-bounce" style="animation-delay: 150ms;"></div>
-                    <div class="w-4 h-4 bg-red-500 rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
+                    <div
+                        class="w-4 h-4 bg-red-500 rounded-full animate-bounce"
+                        style="animation-delay: 0ms;"
+                    ></div>
+                    <div
+                        class="w-4 h-4 bg-red-500 rounded-full animate-bounce"
+                        style="animation-delay: 150ms;"
+                    ></div>
+                    <div
+                        class="w-4 h-4 bg-red-500 rounded-full animate-bounce"
+                        style="animation-delay: 300ms;"
+                    ></div>
                 </div>
-                
+
                 <!-- Loading Text -->
                 <div class="text-gray-300 text-lg font-semibold">
                     {#if isLoadingContent}
@@ -697,7 +796,7 @@
                         Initializing...
                     {/if}
                 </div>
-                
+
                 <!-- Error Message if any -->
                 {#if contentError}
                     <div class="text-yellow-500 text-sm max-w-md mx-auto">
@@ -746,7 +845,9 @@
                             </div>
                         </div>
 
-                        <div class="text-center death-font">
+                        <div
+                            class="fixed top-10 left-0 right-0 text-center death-font"
+                        >
                             <div
                                 class="font-bold"
                                 class:text-red-500={timeRemaining <= 10}
@@ -798,20 +899,23 @@
                                                 word
                                                     .toLowerCase()
                                                     .replace(/[!?.,]/g, ""),
-                                            ) || isPersonName(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            )}
+                                            ) ||
+                                                isPersonName(
+                                                    word
+                                                        .toLowerCase()
+                                                        .replace(/[!?.,]/g, ""),
+                                                )}
                                             class:bg-gray-200={!specialWords.includes(
                                                 word
                                                     .toLowerCase()
                                                     .replace(/[!?.,]/g, ""),
-                                            ) && !lockedWords.has(globalIndex) && !isPersonName(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            )}
+                                            ) &&
+                                                !lockedWords.has(globalIndex) &&
+                                                !isPersonName(
+                                                    word
+                                                        .toLowerCase()
+                                                        .replace(/[!?.,]/g, ""),
+                                                )}
                                             class:bg-black={lockedWords.has(
                                                 globalIndex,
                                             ) &&
@@ -827,29 +931,37 @@
                                                     word
                                                         .toLowerCase()
                                                         .replace(/[!?.,]/g, ""),
-                                                ) || isPersonName(
-                                                    word
-                                                        .toLowerCase()
-                                                        .replace(/[!?.,]/g, ""),
-                                                ))}
+                                                ) ||
+                                                    isPersonName(
+                                                        word
+                                                            .toLowerCase()
+                                                            .replace(
+                                                                /[!?.,]/g,
+                                                                "",
+                                                            ),
+                                                    ))}
                                             class:text-white={specialWords.includes(
                                                 word
                                                     .toLowerCase()
                                                     .replace(/[!?.,]/g, ""),
-                                            ) || lockedWords.has(globalIndex) || isPersonName(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            )}
+                                            ) ||
+                                                lockedWords.has(globalIndex) ||
+                                                isPersonName(
+                                                    word
+                                                        .toLowerCase()
+                                                        .replace(/[!?.,]/g, ""),
+                                                )}
                                             class:text-black={!specialWords.includes(
                                                 word
                                                     .toLowerCase()
                                                     .replace(/[!?.,]/g, ""),
-                                            ) && !lockedWords.has(globalIndex) && !isPersonName(
-                                                word
-                                                    .toLowerCase()
-                                                    .replace(/[!?.,]/g, ""),
-                                            )}
+                                            ) &&
+                                                !lockedWords.has(globalIndex) &&
+                                                !isPersonName(
+                                                    word
+                                                        .toLowerCase()
+                                                        .replace(/[!?.,]/g, ""),
+                                                )}
                                             class:animate-pulse={index ===
                                                 currentWordIndex}
                                             style="transform: rotate({Math.floor(
@@ -873,7 +985,8 @@
                                                                 /[!?.,]/g,
                                                                 "",
                                                             ),
-                                                    ) && !isPersonName(
+                                                    ) &&
+                                                    !isPersonName(
                                                         word
                                                             .toLowerCase()
                                                             .replace(
@@ -1021,7 +1134,35 @@
         </div>
 
         {#if !gameStarted}
-            <div class="text-center">
+            <div class="text-center space-y-6">
+                <!-- Language Selection -->
+                <div class="flex justify-center items-center space-x-4 mb-6">
+                    <span class="text-gray-300 font-medium">Language:</span>
+                    <div
+                        class="flex bg-gray-800 rounded-lg p-1 border border-gray-600"
+                    >
+                        <button
+                            on:click={() => (selectedLanguage = "en")}
+                            class="px-4 py-2 rounded-md font-medium transition-all duration-200 {selectedLanguage ===
+                            'en'
+                                ? 'bg-red-600 text-white shadow-lg'
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700'}"
+                        >
+                            EN
+                        </button>
+                        <button
+                            on:click={() => (selectedLanguage = "id")}
+                            class="px-4 py-2 rounded-md font-medium transition-all duration-200 {selectedLanguage ===
+                            'id'
+                                ? 'bg-red-600 text-white shadow-lg'
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700'}"
+                        >
+                            ID
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Start Button -->
                 <button
                     on:click={startGame}
                     disabled={isLoadingContent}
@@ -1029,9 +1170,18 @@
                 >
                     {#if isLoadingContent}
                         <div class="flex items-center justify-center space-x-2">
-                            <div class="w-4 h-4 bg-white rounded-full animate-bounce" style="animation-delay: 0ms;"></div>
-                            <div class="w-4 h-4 bg-white rounded-full animate-bounce" style="animation-delay: 150ms;"></div>
-                            <div class="w-4 h-4 bg-white rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
+                            <div
+                                class="w-4 h-4 bg-white rounded-full animate-bounce"
+                                style="animation-delay: 0ms;"
+                            ></div>
+                            <div
+                                class="w-4 h-4 bg-white rounded-full animate-bounce"
+                                style="animation-delay: 150ms;"
+                            ></div>
+                            <div
+                                class="w-4 h-4 bg-white rounded-full animate-bounce"
+                                style="animation-delay: 300ms;"
+                            ></div>
                             <span class="ml-2">Loading...</span>
                         </div>
                     {:else}
@@ -1060,9 +1210,6 @@
                 </div>
             {/if}
         {/if}
-        
-
-        
     </div>
 
     <!-- Scoreboard Modal -->
@@ -1188,7 +1335,7 @@
                     style="right: -70%;"
                 >
                     <div class="absolute" style="top:-100px; right: 100px;">
-                        <div class="speech-bubble">Gokil</div>
+                        <div class="speech-bubble">{ryukMessage = selectedLanguage == "id" ? "Gokil!" : "Holy sh*t you right"}</div>
                     </div>
                     <img
                         src="/images/Ryuk-Shinigami-PNG-HD-Quality.png"
@@ -1196,6 +1343,61 @@
                         style="height: 500px;"
                     />
                 </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Mobile Warning Modal -->
+    {#if showMobileWarning}
+        <div
+            class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
+        >
+            <div
+                class="bg-gradient-to-b from-gray-800 to-gray-900 p-8 rounded-lg shadow-2xl max-w-md w-full mx-4 border border-red-600 text-center"
+            >
+                <div class="mb-6">
+                    <!-- Warning Icon -->
+                    <div
+                        class="mx-auto w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mb-4"
+                    >
+                        <svg
+                            class="w-8 h-8 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                        >
+                            <path
+                                fill-rule="evenodd"
+                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                clip-rule="evenodd"
+                            ></path>
+                        </svg>
+                    </div>
+
+                    <h2 class="text-3xl font-bold text-red-500 mb-4 death-font">
+                        Desktop Only
+                    </h2>
+
+                    <div class="space-y-4 text-gray-300">
+                        <p class="text-lg">
+                            This typing test is designed for desktop use only.
+                        </p>
+                        <p class="text-sm">
+                            The game requires a physical keyboard for the best
+                            typing experience and proper functionality.
+                        </p>
+                        <p class="text-sm text-yellow-400">
+                            Please open this website on a desktop or laptop
+                            computer.
+                        </p>
+                    </div>
+                </div>
+
+                <button
+                    on:click={closeMobileWarning}
+                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 w-full"
+                >
+                    I Understand
+                </button>
             </div>
         </div>
     {/if}
@@ -1328,10 +1530,10 @@
     .animate-bounceMessage {
         animation: bounceMessage 200ms ease-in-out;
     }
-    
+
     /* Death glow effect for loading screen */
     .death-glow {
-        text-shadow: 
+        text-shadow:
             0 0 5px #ef4444,
             0 0 10px #ef4444,
             0 0 15px #ef4444,
@@ -1339,10 +1541,10 @@
             0 0 25px #dc2626;
         animation: pulse-glow 2s ease-in-out infinite alternate;
     }
-    
+
     @keyframes pulse-glow {
         from {
-            text-shadow: 
+            text-shadow:
                 0 0 5px #ef4444,
                 0 0 10px #ef4444,
                 0 0 15px #ef4444,
@@ -1350,7 +1552,7 @@
                 0 0 25px #dc2626;
         }
         to {
-            text-shadow: 
+            text-shadow:
                 0 0 10px #ef4444,
                 0 0 15px #ef4444,
                 0 0 20px #ef4444,

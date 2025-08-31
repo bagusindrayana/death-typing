@@ -1,35 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-const COMMON_WORDS = [
-    'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use',
-    'run', 'jump', 'walk', 'talk', 'think', 'write', 'read', 'play', 'work', 'help', 'look', 'find', 'give', 'take', 'come', 'make', 'know', 'tell', 'keep', 'turn', 'move', 'live', 'feel', 'show', 'hear', 'leave', 'ask', 'need', 'try', 'call', 'back', 'open', 'close', 'start', 'stop'
-];
-
-const PERSON_NAMES = [
-    "Satori",
-    "Eko Patrio",
-    "Uya Kuya",
-    "Heri Gunawan",
-    "Ahmad Sahroni",
-    "Immanuel Ebenezer Gerungan",
-    "Yusril Ihza Mahendra",
-    "Yandri Susanto",
-    "Natalius Pigai",
-    "Teddy Indra Widaya",
-    "Giring Ganesha",
-    "Bahlil Lahadalia",
-    "Ario Bimo Nandito Ariotedjo",
-    "Rini Widyantini",
-    "Sri Mulyani",
-    "Fufufafa",
-    "Gibran",
-    "Prabowo"
-];
-
-const SPECIAL_WORDS = [
-    'PPATK','WAMI','DPR','KOMDIGI','KEMENAG','KEMENDAGRI','BUMN','PRESIDEN','death', 'note', 'notebook', 'shinigami', 'kira', 'justice', 'god', 'detective', 'wisdom', 'knowledge', 'intelligence', 'strategy', 'mystery', 'secret', 'truth', 'power', 'control', 'strength', 'courage', 'master'
-];
+import idData from '$lib/data/id.json';
+import enData from '$lib/data/en.json';
 
 interface GeneratedContent {
     sentence: string;
@@ -43,7 +16,7 @@ interface GeneratedContent {
     };
 }
 
-function generateRandomSentence(wordCount: number = 12): GeneratedContent {
+function generateRandomSentence(wordCount: number = 12, language: string = "en"): GeneratedContent {
     const sentence: string[] = [];
     const specialWordsInSentence: string[] = [];
     let commonWordCount = 0;
@@ -53,6 +26,15 @@ function generateRandomSentence(wordCount: number = 12): GeneratedContent {
     const targetSpecialWords = Math.min(Math.floor(wordCount * 0.2) + 1, 3);
     const minNames = 1;
     const targetNames = Math.max(minNames, Math.min(Math.floor(wordCount * 0.15), 2));
+
+    let COMMON_WORDS = enData.COMMON_WORDS;
+    let PERSON_NAMES = enData.PERSON_NAMES;
+    let SPECIAL_WORDS = enData.SPECIAL_WORDS;
+    if(language == "id"){
+        COMMON_WORDS = idData.COMMON_WORDS;
+        PERSON_NAMES = idData.PERSON_NAMES;
+        SPECIAL_WORDS = idData.SPECIAL_WORDS;
+    }
     
     for (let i = 0; i < wordCount; i++) {
         const rand = Math.random();
@@ -110,6 +92,7 @@ function generateRandomSentence(wordCount: number = 12): GeneratedContent {
 
 export const GET: RequestHandler = async ({ url }) => {
     const countParam = url.searchParams.get('count');
+    const language = url.searchParams.get('language');
     const wordsPerSentenceParam = url.searchParams.get('wordsPerSentence');
     
     const count = countParam ? parseInt(countParam, 10) : 5;
@@ -126,10 +109,19 @@ export const GET: RequestHandler = async ({ url }) => {
             error: 'Invalid wordsPerSentence parameter. Must be between 5 and 25.' 
         }, { status: 400 });
     }
+
+    let COMMON_WORDS = enData.COMMON_WORDS;
+    let PERSON_NAMES = enData.PERSON_NAMES;
+    let SPECIAL_WORDS = enData.SPECIAL_WORDS;
+    if(language != undefined && language == "id"){
+        COMMON_WORDS = idData.COMMON_WORDS;
+        PERSON_NAMES = idData.PERSON_NAMES;
+        SPECIAL_WORDS = idData.SPECIAL_WORDS;
+    }
     
     const generatedContent: GeneratedContent[] = [];
     for (let i = 0; i < count; i++) {
-        generatedContent.push(generateRandomSentence(wordsPerSentence));
+        generatedContent.push(generateRandomSentence(wordsPerSentence,language ?? "en"));
     }
     
     const allSpecialWords = [...new Set(generatedContent.flatMap(content => content.specialWords))];
